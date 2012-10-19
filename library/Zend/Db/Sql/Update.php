@@ -1,95 +1,102 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Db
- * @subpackage Sql
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Db
  */
 
 namespace Zend\Db\Sql;
 
-use Zend\Db\Adapter\Adapter,
-    Zend\Db\Adapter\Driver\StatementInterface,
-    Zend\Db\Adapter\Platform\PlatformInterface,
-    Zend\Db\Adapter\Platform\Sql92,
-    Zend\Db\Adapter\ParameterContainer;
+use Zend\Db\Adapter\Adapter;
+use Zend\Db\Adapter\StatementContainerInterface;
+use Zend\Db\Adapter\ParameterContainer;
+use Zend\Db\Adapter\Platform\PlatformInterface;
+use Zend\Db\Adapter\Platform\Sql92;
 
 /**
  * @category   Zend
  * @package    Zend_Db
  * @subpackage Sql
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  *
  * @property Where $where
  */
-class Update implements SqlInterface, PreparableSqlInterface
+class Update extends AbstractSql implements SqlInterface, PreparableSqlInterface
 {
+    /**@#++
+     * @const
+     */
+    const SPECIFICATION_UPDATE = 'update';
+    const SPECIFICATION_WHERE = 'where';
+
     const VALUES_MERGE = 'merge';
     const VALUES_SET   = 'set';
+    /**@#-**/
 
-    protected $specification        = 'UPDATE %1$s SET %2$s';
-    protected $databaseOrSchema     = null;
-    protected $table                = null;
+    protected $specifications = array(
+        self::SPECIFICATION_UPDATE => 'UPDATE %1$s SET %2$s',
+        self::SPECIFICATION_WHERE => 'WHERE %1$s'
+    );
+
+    /**
+     * @var string
+     */
+    protected $table = '';
+
+    /**
+     * @var bool
+     */
     protected $emptyWhereProtection = true;
-    protected $set                  = array();
-    protected $where                = null;
+
+    /**
+     * @var array
+     */
+    protected $set = array();
+
+    /**
+     * @var string|Where
+     */
+    protected $where = null;
 
     /**
      * Constructor
-     * 
-     * @param  null|string $table 
-     * @param  null|string $databaseOrSchema 
-     * @return void
+     *
+     * @param  null|string $table
      */
-    public function __construct($table = null, $databaseOrSchema = null)
+    public function __construct($table = null)
     {
         if ($table) {
-            $this->table($table, $databaseOrSchema);
+            $this->table($table);
         }
         $this->where = new Where();
     }
 
     /**
      * Specify table for statement
-     * 
-     * @param  string $table 
-     * @param  null|string $databaseOrSchema 
+     *
+     * @param  string $table
      * @return Update
      */
-    public function table($table, $databaseOrSchema = null)
+    public function table($table)
     {
         $this->table = $table;
-        if ($databaseOrSchema) {
-            $this->databaseOrSchema = $databaseOrSchema;
-        }
         return $this;
     }
 
     /**
      * Set key/value pairs to update
-     * 
+     *
      * @param  array $values Associative array of key values
      * @param  string $flag One of the VALUES_* constants
+     * @throws Exception\InvalidArgumentException
      * @return Update
      */
     public function set(array $values, $flag = self::VALUES_SET)
     {
         if ($values == null) {
-            throw new \InvalidArgumentException('set() expects an array of values');
+            throw new Exception\InvalidArgumentException('set() expects an array of values');
         }
 
         if ($flag == self::VALUES_SET) {
@@ -98,7 +105,7 @@ class Update implements SqlInterface, PreparableSqlInterface
 
         foreach ($values as $k => $v) {
             if (!is_string($k)) {
-                throw new \Exception('set() expects a string for the value key');
+                throw new Exception\InvalidArgumentException('set() expects a string for the value key');
             }
             $this->set[$k] = $v;
         }
@@ -108,129 +115,153 @@ class Update implements SqlInterface, PreparableSqlInterface
 
     /**
      * Create where clause
-     * 
-     * @param  Where|\Closure|string|array $predicate 
+     *
+     * @param  Where|\Closure|string|array $predicate
      * @param  string $combination One of the OP_* constants from Predicate\PredicateSet
+     * @throws Exception\InvalidArgumentException
      * @return Select
      */
     public function where($predicate, $combination = Predicate\PredicateSet::OP_AND)
     {
+        if (is_null($predicate)) {
+            throw new Exception\InvalidArgumentException('Predicate cannot be null');
+        }
+
         if ($predicate instanceof Where) {
             $this->where = $predicate;
         } elseif ($predicate instanceof \Closure) {
             $predicate($this->where);
         } else {
             if (is_string($predicate)) {
-                $predicate = new Predicate\Literal($predicate);
+                // String $predicate should be passed as an expression
+                $predicate = new Predicate\Expression($predicate);
+                $this->where->addPredicate($predicate, $combination);
             } elseif (is_array($predicate)) {
+
                 foreach ($predicate as $pkey => $pvalue) {
+                    // loop through predicates
+
                     if (is_string($pkey) && strpos($pkey, '?') !== false) {
-                        $predicate = new Predicate\Literal($pkey, $pvalue);
+                        // First, process strings that the abstraction replacement character ?
+                        // as an Expression predicate
+                        $predicate = new Predicate\Expression($pkey, $pvalue);
+
                     } elseif (is_string($pkey)) {
-                        $predicate = new Predicate\Operator($pkey, Predicate\Operator::OP_EQ, $pvalue);
+                        // Otherwise, if still a string, do something intelligent with the PHP type provided
+
+                        if (is_null($pvalue)) {
+                            // map PHP null to SQL IS NULL expression
+                            $predicate = new Predicate\IsNull($pkey, $pvalue);
+                        } elseif (is_array($pvalue)) {
+                            // if the value is an array, assume IN() is desired
+                            $predicate = new Predicate\In($pkey, $pvalue);
+                        } else {
+                            // otherwise assume that array('foo' => 'bar') means "foo" = 'bar'
+                            $predicate = new Predicate\Operator($pkey, Predicate\Operator::OP_EQ, $pvalue);
+                        }
+                    } elseif ($pvalue instanceof Predicate\PredicateInterface) {
+                        // Predicate type is ok
+                        $predicate = $pvalue;
                     } else {
-                        $predicate = new Predicate\Literal($pvalue);
+                        // must be an array of expressions (with int-indexed array)
+                        $predicate = new Predicate\Expression($pvalue);
                     }
+                    $this->where->addPredicate($predicate, $combination);
                 }
             }
-            $this->where->addPredicate($predicate, $combination);
         }
         return $this;
     }
 
-    /*
-    public function isValid($throwException = self::VALID_RETURN_BOOLEAN)
+    public function getRawState($key = null)
     {
-        if ($this->table == null || !is_string($this->table)) {
-            if ($throwException) throw new \Exception('A valid table name is required');
-            return false;
-        }
-
-        if (count($this->values) == 0) {
-            if ($throwException) throw new \Exception('Values are required for this insert object to be valid');
-            return false;
-        }
-
-        if (count($this->columns) > 0 && count($this->columns) != count($this->values)) {
-            if ($throwException) throw new \Exception('When columns are present, there needs to be an equal number of columns and values');
-            return false;
-        }
-
-        return true;
+        $rawState = array(
+            'emptyWhereProtection' => $this->emptyWhereProtection,
+            'table' => $this->table,
+            'set' => $this->set,
+            'where' => $this->where
+        );
+        return (isset($key) && array_key_exists($key, $rawState)) ? $rawState[$key] : $rawState;
     }
-    */
 
     /**
      * Prepare statement
      *
-     * @param \Zend\Db\Adapter\Adapter $adapter
-     * @param \Zend\Db\Adapter\Driver\StatementInterface $statement
+     * @param Adapter $adapter
+     * @param StatementContainerInterface $statementContainer
      * @return void
      */
-    public function prepareStatement(Adapter $adapter, StatementInterface $statement)
+    public function prepareStatement(Adapter $adapter, StatementContainerInterface $statementContainer)
     {
         $driver   = $adapter->getDriver();
         $platform = $adapter->getPlatform();
-        $parameterContainer = $statement->getParameterContainer();
-        $prepareType = $driver->getPrepareType();
+        $parameterContainer = $statementContainer->getParameterContainer();
+
+        if (!$parameterContainer instanceof ParameterContainer) {
+            $parameterContainer = new ParameterContainer();
+            $statementContainer->setParameterContainer($parameterContainer);
+        }
 
         $table = $platform->quoteIdentifier($this->table);
-        if ($this->databaseOrSchema != '') {
-            $table = $platform->quoteIdentifier($this->databaseOrSchema)
-                . $platform->getIdentifierSeparator()
-                . $table;
-        }
 
         $set = $this->set;
         if (is_array($set)) {
             $setSql = array();
-            $values = array();
             foreach ($set as $column => $value) {
-                if ($prepareType == 'positional') {
-                    $parameterContainer->offsetSet(null, $value);
-                    $name = $driver->formatParameterName(null);
-                } elseif ($prepareType == 'named') {
+                if ($value instanceof Expression) {
+                    $exprData = $this->processExpression($value, $platform, $adapter);
+                    $setSql[] = $platform->quoteIdentifier($column) . ' = ' . $exprData->getSql();
+                    $parameterContainer->merge($exprData->getParameterContainer());
+                } else {
+                    $setSql[] = $platform->quoteIdentifier($column) . ' = ' . $driver->formatParameterName($column);
                     $parameterContainer->offsetSet($column, $value);
-                    $name = $driver->formatParameterName($column);
                 }
-                $setSql[] = $platform->quoteIdentifier($column) . ' = ' . $name;
             }
             $set = implode(', ', $setSql);
         }
 
-        $sql = sprintf($this->specification, $table, $set);
-        $statement->setSql($sql);
+        $sql = sprintf($this->specifications[self::SPECIFICATION_UPDATE], $table, $set);
 
-        $this->where->prepareStatement($adapter, $statement);
+        // process where
+        if ($this->where->count() > 0) {
+            $whereParts = $this->processExpression($this->where, $platform, $adapter, 'where');
+            $parameterContainer->merge($whereParts->getParameterContainer());
+            $sql .= ' ' . sprintf($this->specifications[self::SPECIFICATION_WHERE], $whereParts->getSql());
+        }
+        $statementContainer->setSql($sql);
     }
 
     /**
      * Get SQL string for statement
-     * 
-     * @param  null|PlatformInterface $platform If null, defaults to Sql92
+     *
+     * @param  null|PlatformInterface $adapterPlatform If null, defaults to Sql92
      * @return string
      */
-    public function getSqlString(PlatformInterface $platform = null)
+    public function getSqlString(PlatformInterface $adapterPlatform = null)
     {
-        $platform = ($platform) ?: new Sql92;
-        $table = $platform->quoteIdentifier($this->table);
-
-        if ($this->databaseOrSchema != '') {
-            $table = $platform->quoteIdentifier($this->databaseOrSchema) . $platform->getIdentifierSeparator() . $table;
-        }
+        $adapterPlatform = ($adapterPlatform) ?: new Sql92;
+        $table = $adapterPlatform->quoteIdentifier($this->table);
 
         $set = $this->set;
         if (is_array($set)) {
             $setSql = array();
-            foreach ($set as $setName => $setValue) {
-                $setSql[] = $platform->quoteIdentifier($setName) . ' = ' . $platform->quoteValue($setValue);
+            foreach ($set as $column => $value) {
+                if ($value instanceof Expression) {
+                    $exprData = $this->processExpression($value, $adapterPlatform);
+                    $setSql[] = $adapterPlatform->quoteIdentifier($column) . ' = ' . $exprData->getSql();
+                } elseif (is_null($value)) {
+                    $setSql[] = $adapterPlatform->quoteIdentifier($column) . ' = NULL';
+                } else {
+                    $setSql[] = $adapterPlatform->quoteIdentifier($column) . ' = ' . $adapterPlatform->quoteValue($value);
+                }
             }
             $set = implode(', ', $setSql);
         }
 
-        $sql = sprintf($this->specification, $table, $set);
+        $sql = sprintf($this->specifications[self::SPECIFICATION_UPDATE], $table, $set);
         if ($this->where->count() > 0) {
-            $sql .= $this->where->getSqlString($platform);
+            $whereParts = $this->processExpression($this->where, $adapterPlatform, null, 'where');
+            $sql .= ' ' . sprintf($this->specifications[self::SPECIFICATION_WHERE], $whereParts->getSql());
         }
         return $sql;
     }
@@ -239,8 +270,8 @@ class Update implements SqlInterface, PreparableSqlInterface
      * Variable overloading
      *
      * Proxies to "where" only
-     * 
-     * @param  string $name 
+     *
+     * @param  string $name
      * @return mixed
      */
     public function __get($name)
@@ -249,5 +280,17 @@ class Update implements SqlInterface, PreparableSqlInterface
             case 'where':
                 return $this->where;
         }
+    }
+
+    /**
+     * __clone
+     *
+     * Resets the where object each time the Update is cloned.
+     *
+     * @return void
+     */
+    public function __clone()
+    {
+        $this->where = clone $this->where;
     }
 }

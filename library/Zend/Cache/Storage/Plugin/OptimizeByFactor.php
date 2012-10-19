@@ -1,37 +1,24 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Cache
- * @subpackage Storage
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Cache
  */
 
 namespace Zend\Cache\Storage\Plugin;
 
-use Traversable,
-    Zend\Cache\Exception,
-    Zend\Cache\Storage\PostEvent,
-    Zend\EventManager\EventCollection;
+use Zend\Cache\Exception;
+use Zend\Cache\Storage\OptimizableInterface;
+use Zend\Cache\Storage\PostEvent;
+use Zend\EventManager\EventManagerInterface;
 
 /**
  * @category   Zend
  * @package    Zend_Cache
  * @subpackage Storage
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 class OptimizeByFactor extends AbstractPlugin
 {
@@ -45,13 +32,14 @@ class OptimizeByFactor extends AbstractPlugin
     /**
      * Attach
      *
-     * @param  EventCollection $eventCollection
+     * @param  EventManagerInterface $events
+     * @param  int                   $priority
      * @return OptimizeByFactor
      * @throws Exception\LogicException
      */
-    public function attach(EventCollection $eventCollection)
+    public function attach(EventManagerInterface $events, $priority = 1)
     {
-        $index = spl_object_hash($eventCollection);
+        $index = spl_object_hash($events);
         if (isset($this->handles[$index])) {
             throw new Exception\LogicException('Plugin already attached');
         }
@@ -59,10 +47,9 @@ class OptimizeByFactor extends AbstractPlugin
         $handles = array();
         $this->handles[$index] = & $handles;
 
-        $handles[] = $eventCollection->attach('removeItem.post',       array($this, 'optimizeByFactor'));
-        $handles[] = $eventCollection->attach('removeItems.post',      array($this, 'optimizeByFactor'));
-        $handles[] = $eventCollection->attach('clear.post',            array($this, 'optimizeByFactor'));
-        $handles[] = $eventCollection->attach('clearByNamespace.post', array($this, 'optimizeByFactor'));
+        $callback = array($this, 'optimizeByFactor');
+        $handles[] = $events->attach('removeItem.post',  $callback, $priority);
+        $handles[] = $events->attach('removeItems.post', $callback, $priority);
 
         return $this;
     }
@@ -70,20 +57,20 @@ class OptimizeByFactor extends AbstractPlugin
     /**
      * Detach
      *
-     * @param  EventCollection $eventCollection
+     * @param  EventManagerInterface $events
      * @return OptimizeByFactor
      * @throws Exception\LogicException
      */
-    public function detach(EventCollection $eventCollection)
+    public function detach(EventManagerInterface $events)
     {
-        $index = spl_object_hash($eventCollection);
+        $index = spl_object_hash($events);
         if (!isset($this->handles[$index])) {
             throw new Exception\LogicException('Plugin not attached');
         }
 
         // detach all handles of this index
         foreach ($this->handles[$index] as $handle) {
-            $eventCollection->detach($handle);
+            $events->detach($handle);
         }
 
         // remove all detached handles
@@ -100,10 +87,14 @@ class OptimizeByFactor extends AbstractPlugin
      */
     public function optimizeByFactor(PostEvent $event)
     {
+        $storage = $event->getStorage();
+        if (!($storage instanceof OptimizableInterface)) {
+            return;
+        }
+
         $factor = $this->getOptions()->getOptimizingFactor();
-        if ($factor && $event->getResult() && mt_rand(1, $factor) == 1) {
-            $params = $event->getParams();
-            $event->getStorage()->optimize($params['options']);
+        if ($factor && mt_rand(1, $factor) == 1) {
+            $storage->optimize();
         }
     }
 }

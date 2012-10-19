@@ -1,13 +1,23 @@
 <?php
+/**
+ * Zend Framework (http://framework.zend.com/)
+ *
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Http
+ */
 
 namespace Zend\Http\Header;
+
+use Closure;
 
 /**
  * @throws Exception\InvalidArgumentException
  * @see http://www.ietf.org/rfc/rfc2109.txt
  * @see http://www.w3.org/Protocols/rfc2109/rfc2109
  */
-class SetCookie implements MultipleHeaderDescription
+class SetCookie implements MultipleHeaderInterface
 {
 
     /**
@@ -26,18 +36,18 @@ class SetCookie implements MultipleHeaderDescription
 
     /**
      * Version
-     * 
+     *
      * @var integer
      */
     protected $version = null;
-    
+
     /**
      * Max Age
-     * 
+     *
      * @var integer
      */
     protected $maxAge = null;
-    
+
     /**
      * Cookie expiry date
      *
@@ -67,7 +77,7 @@ class SetCookie implements MultipleHeaderDescription
     protected $secure = null;
 
     /**
-     * @var true
+     * @var boolean|null
      */
     protected $httponly = null;
 
@@ -96,6 +106,14 @@ class SetCookie implements MultipleHeaderDescription
                         $headerValue = null;
                     }
 
+                    // First K=V pair is always the cookie name and value
+                    if ($header->getName() === NULL) {
+                        $header->setName($headerKey);
+                        $header->setValue($headerValue);
+                        continue;
+                    }
+
+                    // Process the remaining elements
                     switch (str_replace(array('-', '_'), '', strtolower($headerKey))) {
                         case 'expires' : $header->setExpires($headerValue); break;
                         case 'domain'  : $header->setDomain($headerValue); break;
@@ -105,8 +123,7 @@ class SetCookie implements MultipleHeaderDescription
                         case 'version' : $header->setVersion((int) $headerValue); break;
                         case 'maxage'  : $header->setMaxAge((int) $headerValue); break;
                         default:
-                            $header->setName($headerKey);
-                            $header->setValue($headerValue);
+                            // Intentionally omitted
                     }
                 }
 
@@ -141,14 +158,16 @@ class SetCookie implements MultipleHeaderDescription
      *
      * @param string $name
      * @param string $value
-     * @param string $domain
      * @param int $expires
      * @param string $path
+     * @param string $domain
      * @param bool $secure
      * @param bool $httponly
+     * @param string $maxAge
+     * @param int $version
      * @return SetCookie
      */
-    public function __construct($name = null, $value = null, $version = null, $maxAge = null, $domain = null, $expires = null, $path = null, $secure = false, $httponly = true)
+    public function __construct($name = null, $value = null, $expires = null, $path = null, $domain = null, $secure = false, $httponly = false, $maxAge = null, $version = null)
     {
         $this->type = 'Cookie';
 
@@ -163,11 +182,11 @@ class SetCookie implements MultipleHeaderDescription
         if ($version!==null) {
             $this->setVersion($version);
         }
-        
+
         if ($maxAge!==null) {
             $this->setMaxAge($maxAge);
         }
-        
+
         if ($domain) {
             $this->setDomain($domain);
         }
@@ -176,8 +195,16 @@ class SetCookie implements MultipleHeaderDescription
             $this->setExpires($expires);
         }
 
+        if ($path) {
+            $this->setPath($path);
+        }
+
         if ($secure) {
             $this->setSecure($secure);
+        }
+
+        if ($httponly) {
+            $this->setHttpOnly($httponly);
         }
     }
 
@@ -198,9 +225,9 @@ class SetCookie implements MultipleHeaderDescription
         if ($this->getName() == '') {
             throw new Exception\RuntimeException('A cookie name is required to generate a field value for this cookie');
         }
-        
+
         $value = $this->getValue();
-        if (strpos($value,'"')!==false) {
+        if (strpos($value, '"')!==false) {
             $value = '"'.urlencode(str_replace('"', '', $value)).'"';
         } else {
             $value = urlencode($value);
@@ -211,12 +238,12 @@ class SetCookie implements MultipleHeaderDescription
         if ($version!==null) {
             $fieldValue .= '; Version=' . $version;
         }
-        
+
         $maxAge = $this->getMaxAge();
         if ($maxAge!==null) {
             $fieldValue .= '; Max-Age=' . $maxAge;
         }
-        
+
         $expires = $this->getExpires();
         if ($expires) {
             $fieldValue .= '; Expires=' . $expires;
@@ -245,6 +272,7 @@ class SetCookie implements MultipleHeaderDescription
 
     /**
      * @param string $name
+     * @throws Exception\InvalidArgumentException
      * @return SetCookie
      */
     public function setName($name)
@@ -283,8 +311,9 @@ class SetCookie implements MultipleHeaderDescription
 
     /**
      * Set version
-     * 
+     *
      * @param integer $version
+     * @throws Exception\InvalidArgumentException
      */
     public function setVersion($version)
     {
@@ -293,21 +322,22 @@ class SetCookie implements MultipleHeaderDescription
         }
         $this->version = $version;
     }
-    
+
     /**
      * Get version
-     * 
+     *
      * @return integer
      */
     public function getVersion()
     {
         return $this->version;
     }
-    
+
     /**
      * Set Max-Age
-     * 
+     *
      * @param integer $maxAge
+     * @throws Exception\InvalidArgumentException
      */
     public function setMaxAge($maxAge)
     {
@@ -316,19 +346,20 @@ class SetCookie implements MultipleHeaderDescription
         }
         $this->maxAge = $maxAge;
     }
-    
+
     /**
      * Get Max-Age
-     * 
+     *
      * @return integer
      */
     public function getMaxAge()
     {
         return $this->maxAge;
     }
-    
+
     /**
      * @param int $expires
+     * @throws Exception\InvalidArgumentException
      * @return SetCookie
      */
     public function setExpires($expires)
@@ -345,6 +376,7 @@ class SetCookie implements MultipleHeaderDescription
     }
 
     /**
+     * @param bool $inSeconds
      * @return int
      */
     public function getExpires($inSeconds = false)
@@ -407,7 +439,7 @@ class SetCookie implements MultipleHeaderDescription
     }
 
     /**
-     * @param \Zend\Http\Header\true $httponly
+     * @param boolean $httponly
      */
     public function setHttponly($httponly)
     {
@@ -415,7 +447,7 @@ class SetCookie implements MultipleHeaderDescription
     }
 
     /**
-     * @return \Zend\Http\Header\true
+     * @return boolean
      */
     public function isHttponly()
     {
@@ -455,7 +487,7 @@ class SetCookie implements MultipleHeaderDescription
 
     public function isValidForRequest($requestDomain, $path, $isSecure = false)
     {
-        if ($this->getDomain() && (strrpos($requestDomain, $this->getDomain()) !== false)) {
+        if ($this->getDomain() && (strrpos($requestDomain, $this->getDomain()) === false)) {
             return false;
         }
 

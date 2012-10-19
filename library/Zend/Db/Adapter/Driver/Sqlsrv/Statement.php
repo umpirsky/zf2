@@ -1,39 +1,27 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Db
- * @subpackage Adapter
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Db
  */
 
 namespace Zend\Db\Adapter\Driver\Sqlsrv;
 
-use Zend\Db\Adapter\Driver\StatementInterface,
-    Zend\Db\Adapter\ParameterContainer,
-    Zend\Db\Adapter\ParameterContainerInterface;
+use Zend\Db\Adapter\Driver\StatementInterface;
+use Zend\Db\Adapter\Exception;
+use Zend\Db\Adapter\ParameterContainer;
 
 /**
  * @category   Zend
  * @package    Zend_Db
  * @subpackage Adapter
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 class Statement implements StatementInterface
 {
+
     /**
      * @var resource
      */
@@ -58,12 +46,12 @@ class Statement implements StatementInterface
      * @var array
      */
     protected $parameterReferences = array();
-    
+
     /**
-     * @var Zend\Db\Adapter\ParameterContainer\ParameterContainer
+     * @var ParameterContainer
      */
     protected $parameterContainer = null;
-    
+
     /**
      * @var resource
      */
@@ -77,50 +65,76 @@ class Statement implements StatementInterface
 
     /**
      * Set driver
-     * 
+     *
      * @param  Sqlsrv $driver
-     * @return Statement 
+     * @return Statement
      */
     public function setDriver(Sqlsrv $driver)
     {
         $this->driver = $driver;
         return $this;
     }
-    
+
     /**
-     * 
+     *
      * One of two resource types will be provided here:
      * a) "SQL Server Connection" when a prepared statement needs to still be produced
-     * b) "SQL Server Statement" when a prepared statement has been already produced 
+     * b) "SQL Server Statement" when a prepared statement has been already produced
      * (there will need to already be a bound param set if it applies to this query)
-     * 
-     * @param resource
+     *
+     * @param resource $resource
+     * @throws Exception\InvalidArgumentException
+     * @return Statement
      */
     public function initialize($resource)
     {
-        $this->sqlsrv = $resource;
+        $resourceType = get_resource_type($resource);
+
+        if ($resourceType == 'SQL Server Connection') {
+            $this->sqlsrv = $resource;
+        } elseif ($resourceType == 'SQL Server Statement') {
+            $this->resource = $resource;
+            $this->isPrepared = true;
+        } else {
+            throw new Exception\InvalidArgumentException('Invalid resource provided to ' . __CLASS__);
+        }
+
+        return $this;
     }
 
     /**
      * Set parameter container
-     * 
-     * @param ParameterContainerInterface $parameterContainer 
+     *
+     * @param ParameterContainer $parameterContainer
+     * @return Statement
      */
-    public function setParameterContainer(ParameterContainerInterface $parameterContainer)
+    public function setParameterContainer(ParameterContainer $parameterContainer)
     {
         $this->parameterContainer = $parameterContainer;
+        return $this;
     }
 
     /**
-     * @return ParameterContainerInterface
+     * @return ParameterContainer
      */
     public function getParameterContainer()
     {
         return $this->parameterContainer;
     }
+
+    /**
+     * @param $resource
+     * @return Statement
+     */
+    public function setResource($resource)
+    {
+        $this->resource = $resource;
+        return $this;
+    }
+
     /**
      * Get resource
-     * 
+     *
      * @return resource
      */
     public function getResource()
@@ -130,28 +144,33 @@ class Statement implements StatementInterface
 
     /**
      * @param string $sql
+     * @return Statement
      */
     public function setSql($sql)
     {
         $this->sql = $sql;
+        return $this;
     }
+
     /**
      * Get sql
-     * 
-     * @return string 
+     *
+     * @return string
      */
-    public function getSQL()
+    public function getSql()
     {
         return $this->sql;
     }
 
     /**
      * @param string $sql
+     * @throws Exception\RuntimeException
+     * @return Statement
      */
     public function prepare($sql = null)
     {
         if ($this->isPrepared) {
-            throw new \Exception('Already prepared');
+            throw new Exception\RuntimeException('Already prepared');
         }
         $sql = ($sql) ?: $this->sql;
 
@@ -163,6 +182,7 @@ class Statement implements StatementInterface
         $this->resource = sqlsrv_prepare($this->sqlsrv, $sql, $pRef);
 
         $this->isPrepared = true;
+        return $this;
     }
 
     /**
@@ -172,11 +192,13 @@ class Statement implements StatementInterface
     {
         return $this->isPrepared;
     }
+
     /**
      * Execute
-     * 
-     * @param  array|ParameterContainerInterface $parameters
-     * @return type 
+     *
+     * @param  array|ParameterContainer $parameters
+     * @throws Exception\RuntimeException
+     * @return Result
      */
     public function execute($parameters = null)
     {
@@ -184,19 +206,24 @@ class Statement implements StatementInterface
             $this->prepare();
         }
 
-        if ($parameters !== null) {
-            if (is_array($parameters)) {
-                $parameters = new ParameterContainer($parameters);
+        /** START Standard ParameterContainer Merging Block */
+        if (!$this->parameterContainer instanceof ParameterContainer) {
+            if ($parameters instanceof ParameterContainer) {
+                $this->parameterContainer = $parameters;
+                $parameters = null;
+            } else {
+                $this->parameterContainer = new ParameterContainer();
             }
-            if (!$parameters instanceof ParameterContainerInterface) {
-                throw new \InvalidArgumentException('ParameterContainer expected');
-            }
-            $this->parameterContainer = $parameters;
         }
 
-        if ($this->parameterContainer) {
+        if (is_array($parameters)) {
+            $this->parameterContainer->setFromArray($parameters);
+        }
+
+        if ($this->parameterContainer->count() > 0) {
             $this->bindParametersFromContainer();
         }
+        /** END Standard ParameterContainer Merging Block */
 
         $resultValue = sqlsrv_execute($this->resource);
 
@@ -204,20 +231,21 @@ class Statement implements StatementInterface
             $errors = sqlsrv_errors();
             // ignore general warnings
             if ($errors[0]['SQLSTATE'] != '01000') {
-                throw new \RuntimeException($errors[0]['message']);
+                throw new Exception\RuntimeException($errors[0]['message']);
             }
         }
 
         $result = $this->driver->createResult($this->resource);
         return $result;
     }
+
     /**
      * Bind parameters from container
-     * 
+     *
      */
     protected function bindParametersFromContainer()
     {
-        $values = $this->parameterContainer->toArray();
+        $values = $this->parameterContainer->getPositionalArray();
         $position = 0;
         foreach ($values as $value) {
             $this->parameterReferences[$position++][0] = $value;

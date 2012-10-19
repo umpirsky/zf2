@@ -1,22 +1,11 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Db
- * @subpackage Sql
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Db
  */
 
 namespace Zend\Db\Sql\Predicate;
@@ -25,8 +14,6 @@ namespace Zend\Db\Sql\Predicate;
  * @category   Zend
  * @package    Zend_Db
  * @subpackage Sql
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 class Between implements PredicateInterface
 {
@@ -34,14 +21,13 @@ class Between implements PredicateInterface
     protected $identifier    = null;
     protected $minValue      = null;
     protected $maxValue      = null;
-    
+
     /**
      * Constructor
-     * 
-     * @param  string $identifier 
-     * @param  string $minValue 
-     * @param  string $maxValue 
-     * @return void
+     *
+     * @param  string $identifier
+     * @param  int|float|string $minValue
+     * @param  int|float|string $maxValue
      */
     public function __construct($identifier = null, $minValue = null, $maxValue = null)
     {
@@ -58,8 +44,8 @@ class Between implements PredicateInterface
 
     /**
      * Set identifier for comparison
-     * 
-     * @param  string $identifier 
+     *
+     * @param  string $identifier
      * @return Between
      */
     public function setIdentifier($identifier)
@@ -70,7 +56,7 @@ class Between implements PredicateInterface
 
     /**
      * Get identifier of comparison
-     * 
+     *
      * @return null|string
      */
     public function getIdentifier()
@@ -80,8 +66,8 @@ class Between implements PredicateInterface
 
     /**
      * Set minimum boundary for comparison
-     * 
-     * @param  int|float|string $minValue 
+     *
+     * @param  int|float|string $minValue
      * @return Between
      */
     public function setMinValue($minValue)
@@ -92,7 +78,7 @@ class Between implements PredicateInterface
 
     /**
      * Get minimum boundary for comparison
-     * 
+     *
      * @return null|int|float|string
      */
     public function getMinValue()
@@ -102,8 +88,8 @@ class Between implements PredicateInterface
 
     /**
      * Set maximum boundary for comparison
-     * 
-     * @param  int|float|string $maxValue 
+     *
+     * @param  int|float|string $maxValue
      * @return Between
      */
     public function setMaxValue($maxValue)
@@ -114,7 +100,7 @@ class Between implements PredicateInterface
 
     /**
      * Get maximum boundary for comparison
-     * 
+     *
      * @return null|int|float|string
      */
     public function getMaxValue()
@@ -124,8 +110,8 @@ class Between implements PredicateInterface
 
     /**
      * Set specification string to use in forming SQL predicate
-     * 
-     * @param  string $specification 
+     *
+     * @param  string $specification
      * @return Between
      */
     public function setSpecification($specification)
@@ -136,7 +122,7 @@ class Between implements PredicateInterface
 
     /**
      * Get specification string to use in forming SQL predicate
-     * 
+     *
      * @return string
      */
     public function getSpecification()
@@ -149,7 +135,7 @@ class Between implements PredicateInterface
      *
      * @return array
      */
-    public function getWhereParts()
+    public function getExpressionData()
     {
         return array(
             array(

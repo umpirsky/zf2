@@ -1,84 +1,84 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Db
- * @subpackage Sql
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Db
  */
 
 namespace Zend\Db\Sql;
 
-use Zend\Db\Adapter\Adapter,
-    Zend\Db\Adapter\Driver\StatementInterface,
-    Zend\Db\Adapter\Platform\PlatformInterface,
-    Zend\Db\Adapter\Platform\Sql92,
-    Zend\Db\Adapter\ParameterContainer;
+use Zend\Db\Adapter\Adapter;
+use Zend\Db\Adapter\StatementContainerInterface;
+use Zend\Db\Adapter\ParameterContainer;
+use Zend\Db\Adapter\Platform\PlatformInterface;
+use Zend\Db\Adapter\Platform\Sql92;
 
 /**
  * @category   Zend
  * @package    Zend_Db
  * @subpackage Sql
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
-class Insert implements SqlInterface, PreparableSqlInterface
+class Insert extends AbstractSql implements SqlInterface, PreparableSqlInterface
 {
+    /**#@+
+     * Constants
+     *
+     * @const
+     */
+    const SPECIFICATION_INSERT = 'insert';
     const VALUES_MERGE = 'merge';
     const VALUES_SET   = 'set';
+    /**#@-*/
 
-    protected $specification    = 'INSERT INTO %1$s (%2$s) VALUES (%3$s)';
+    /**
+     * @var array Specification array
+     */
+    protected $specifications = array(
+        self::SPECIFICATION_INSERT => 'INSERT INTO %1$s (%2$s) VALUES (%3$s)'
+    );
+
+    /**
+     * @var string
+     */
     protected $table            = null;
-    protected $databaseOrSchema = null;
     protected $columns          = array();
+
+    /**
+     * @var array
+     */
     protected $values           = array();
 
     /**
      * Constructor
-     * 
-     * @param  null|string $table 
-     * @param  null|string $databaseOrSchema 
-     * @return void
+     *
+     * @param  null|string $table
      */
-    public function __construct($table = null, $databaseOrSchema = null)
+    public function __construct($table = null)
     {
         if ($table) {
-            $this->into($table, $databaseOrSchema);
+            $this->into($table);
         }
     }
 
     /**
      * Crete INTO clause
-     * 
-     * @param  string $table 
-     * @param  null|string $databaseOrSchema 
+     *
+     * @param  string $table
      * @return Insert
      */
-    public function into($table, $databaseOrSchema = null)
+    public function into($table)
     {
         $this->table = $table;
-        if ($databaseOrSchema) {
-            $this->databaseOrSchema = $databaseOrSchema;
-        }
         return $this;
     }
 
     /**
      * Specify columns
-     * 
-     * @param  array $columns 
+     *
+     * @param  array $columns
      * @return Insert
      */
     public function columns(array $columns)
@@ -89,9 +89,10 @@ class Insert implements SqlInterface, PreparableSqlInterface
 
     /**
      * Specify values to insert
-     * 
-     * @param  array $values 
+     *
+     * @param  array $values
      * @param  string $flag one of VALUES_MERGE or VALUES_SET; defaults to VALUES_SET
+     * @throws Exception\InvalidArgumentException
      * @return Insert
      */
     public function values(array $values, $flag = self::VALUES_SET)
@@ -104,7 +105,11 @@ class Insert implements SqlInterface, PreparableSqlInterface
         $firstKey = current($keys);
 
         if (is_string($firstKey)) {
-            $this->columns($keys);
+            if ($flag == self::VALUES_MERGE) {
+                $this->columns(array_merge($this->columns, $keys));
+            } else {
+                $this->columns($keys);
+            }
             $values = array_values($values);
         } elseif (is_int($firstKey)) {
             $values = array_values($values);
@@ -119,78 +124,99 @@ class Insert implements SqlInterface, PreparableSqlInterface
         return $this;
     }
 
+    public function getRawState($key = null)
+    {
+        $rawState = array(
+            'table' => $this->table,
+            'columns' => $this->columns,
+            'values' => $this->values
+        );
+        return (isset($key) && array_key_exists($key, $rawState)) ? $rawState[$key] : $rawState;
+    }
 
     /**
      * Prepare statement
      *
      * @param  Adapter $adapter
-     * @param  StatementInterface $statement
+     * @param  StatementContainerInterface $statementContainer
      * @return void
      */
-    public function prepareStatement(Adapter $adapter, StatementInterface $statement)
+    public function prepareStatement(Adapter $adapter, StatementContainerInterface $statementContainer)
     {
         $driver   = $adapter->getDriver();
         $platform = $adapter->getPlatform();
-        $parameterContainer = $statement->getParameterContainer();
-        $prepareType = $driver->getPrepareType();
+        $parameterContainer = $statementContainer->getParameterContainer();
+
+        if (!$parameterContainer instanceof ParameterContainer) {
+            $parameterContainer = new ParameterContainer();
+            $statementContainer->setParameterContainer($parameterContainer);
+        }
 
         $table = $platform->quoteIdentifier($this->table);
-        if ($this->databaseOrSchema != '') {
-            $table = $platform->quoteIdentifier($this->databaseOrSchema)
-                . $platform->getIdentifierSeparator()
-                . $table;
-        }
 
         $columns = array();
         $values  = array();
 
         foreach ($this->columns as $cIndex => $column) {
             $columns[$cIndex] = $platform->quoteIdentifier($column);
-            if ($prepareType == 'positional') {
-                $parameterContainer->offsetSet(null, $this->values[$cIndex]);
-                $values[$cIndex] = $driver->formatParameterName(null);
-            } elseif ($prepareType == 'named') {
+            if ($this->values[$cIndex] instanceof Expression) {
+                $exprData = $this->processExpression($this->values[$cIndex], $platform, $adapter);
+                $values[$cIndex] = $exprData->getSql();
+                $parameterContainer->merge($exprData->getParameterContainer());
+            } else {
                 $values[$cIndex] = $driver->formatParameterName($column);
                 $parameterContainer->offsetSet($column, $this->values[$cIndex]);
             }
         }
 
-        $sql = sprintf($this->specification, $table, implode(', ', $columns), implode(', ', $values));
+        $sql = sprintf(
+            $this->specifications[self::SPECIFICATION_INSERT],
+            $table,
+            implode(', ', $columns),
+            implode(', ', $values)
+        );
 
-        $statement->setSql($sql);
+        $statementContainer->setSql($sql);
     }
 
     /**
      * Get SQL string for this statement
-     * 
-     * @param  null|PlatformInterface $platform Defaults to Sql92 if none provided
+     *
+     * @param  null|PlatformInterface $adapterPlatform Defaults to Sql92 if none provided
      * @return string
      */
-    public function getSqlString(PlatformInterface $platform = null)
+    public function getSqlString(PlatformInterface $adapterPlatform = null)
     {
-        $platform = ($platform) ?: new Sql92;
-        $table = $platform->quoteIdentifier($this->table);
+        $adapterPlatform = ($adapterPlatform) ?: new Sql92;
+        $table = $adapterPlatform->quoteIdentifier($this->table);
 
-        if ($this->databaseOrSchema != '') {
-            $table = $platform->quoteIdentifier($this->databaseOrSchema) . $platform->getIdentifierSeparator() . $table;
-        }
-
-        $columns = array_map(array($platform, 'quoteIdentifier'), $this->columns);
+        $columns = array_map(array($adapterPlatform, 'quoteIdentifier'), $this->columns);
         $columns = implode(', ', $columns);
 
-        $values = array_map(array($platform, 'quoteValue'), $this->values);
+        $values = array();
+        foreach ($this->values as $value) {
+            if ($value instanceof Expression) {
+                $exprData = $this->processExpression($value, $adapterPlatform);
+                $values[] = $exprData->getSql();
+            } elseif (is_null($value)) {
+                $values[] = 'NULL';
+            } else {
+                $values[] = $adapterPlatform->quoteValue($value);
+            }
+        }
+
         $values = implode(', ', $values);
 
-        return sprintf($this->specification, $table, $columns, $values);
+        return sprintf($this->specifications[self::SPECIFICATION_INSERT], $table, $columns, $values);
     }
 
     /**
      * Overloading: variable setting
      *
      * Proxies to values, using VALUES_MERGE strategy
-     * 
-     * @param  string $name 
-     * @param  mixed $value 
+     *
+     * @param  string $name
+     * @param  mixed $value
      * @return Insert
      */
     public function __set($name, $value)
@@ -204,14 +230,15 @@ class Insert implements SqlInterface, PreparableSqlInterface
      * Overloading: variable unset
      *
      * Proxies to values and columns
-     * 
-     * @param  string $name 
+     *
+     * @param  string $name
+     * @throws Exception\InvalidArgumentException
      * @return void
      */
     public function __unset($name)
     {
         if (($position = array_search($name, $this->columns)) === false) {
-            throw new \InvalidArgumentException('The key ' . $name . ' was not found in this objects column list');
+            throw new Exception\InvalidArgumentException('The key ' . $name . ' was not found in this objects column list');
         }
 
         unset($this->columns[$position]);
@@ -222,8 +249,8 @@ class Insert implements SqlInterface, PreparableSqlInterface
      * Overloading: variable isset
      *
      * Proxies to columns; does a column of that name exist?
-     * 
-     * @param  string $name 
+     *
+     * @param  string $name
      * @return bool
      */
     public function __isset($name)
@@ -235,14 +262,15 @@ class Insert implements SqlInterface, PreparableSqlInterface
      * Overloading: variable retrieval
      *
      * Retrieves value by column name
-     * 
-     * @param  string $name 
+     *
+     * @param  string $name
+     * @throws Exception\InvalidArgumentException
      * @return mixed
      */
     public function __get($name)
     {
         if (($position = array_search($name, $this->columns)) === false) {
-            throw new \InvalidArgumentException('The key ' . $name . ' was not found in this objects column list');
+            throw new Exception\InvalidArgumentException('The key ' . $name . ' was not found in this objects column list');
         }
         return $this->values[$position];
     }

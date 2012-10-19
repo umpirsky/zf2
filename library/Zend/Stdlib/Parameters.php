@@ -1,19 +1,30 @@
 <?php
+/**
+ * Zend Framework (http://framework.zend.com/)
+ *
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Stdlib
+ */
 
 namespace Zend\Stdlib;
 
 use ArrayObject;
 
-class Parameters extends ArrayObject implements ParametersDescription
+/**
+ * @category   Zend
+ * @package    Zend_Stdlib
+ */
+class Parameters extends ArrayObject implements ParametersInterface
 {
     /**
      * Constructor
      *
      * Enforces that we have an array, and enforces parameter access to array
      * elements.
-     * 
-     * @param  array $values 
-     * @return void
+     *
+     * @param  array $values
      */
     public function __construct(array $values = null)
     {
@@ -25,8 +36,8 @@ class Parameters extends ArrayObject implements ParametersDescription
 
     /**
      * Populate from native PHP array
-     * 
-     * @param  array $values 
+     *
+     * @param  array $values
      * @return void
      */
     public function fromArray(array $values)
@@ -36,8 +47,8 @@ class Parameters extends ArrayObject implements ParametersDescription
 
     /**
      * Populate from query string
-     * 
-     * @param  string $string 
+     *
+     * @param  string $string
      * @return void
      */
     public function fromString($string)
@@ -49,7 +60,7 @@ class Parameters extends ArrayObject implements ParametersDescription
 
     /**
      * Serialize to native PHP array
-     * 
+     *
      * @return array
      */
     public function toArray()
@@ -59,7 +70,7 @@ class Parameters extends ArrayObject implements ParametersDescription
 
     /**
      * Serialize to query string
-     * 
+     *
      * @return string
      */
     public function toString()
@@ -71,8 +82,8 @@ class Parameters extends ArrayObject implements ParametersDescription
      * Retrieve by key
      *
      * Returns null if the key does not exist.
-     * 
-     * @param  string $name 
+     *
+     * @param  string $name
      * @return mixed
      */
     public function offsetGet($name)
@@ -82,7 +93,7 @@ class Parameters extends ArrayObject implements ParametersDescription
         }
         return null;
     }
-    
+
     /**
      * @param string $name
      * @param mixed $default optional default value
@@ -95,11 +106,11 @@ class Parameters extends ArrayObject implements ParametersDescription
         }
         return $default;
     }
-    
+
     /**
      * @param string $name
      * @param mixed $value
-     * @return $this
+     * @return Parameters
      */
     public function set($name, $value)
     {

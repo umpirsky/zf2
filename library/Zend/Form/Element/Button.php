@@ -19,26 +19,25 @@
  * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 
-/**
- * @namespace
- */
 namespace Zend\Form\Element;
 
+use Zend\Form\Element;
+
 /**
- * Button form element
- *
- * @uses       \Zend\Form\Element\Submit
  * @category   Zend
  * @package    Zend_Form
  * @subpackage Element
  * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
  * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
-class Button extends Submit
+class Button extends Element
 {
     /**
-     * Use formButton view helper by default
-     * @var string
+     * Seed attributes
+     *
+     * @var array
      */
-    public $helper = 'formButton';
+    protected $attributes = array(
+        'type' => 'button',
+    );
 }

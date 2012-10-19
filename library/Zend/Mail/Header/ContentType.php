@@ -1,44 +1,24 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Mail
- * @subpackage Header
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Mail
  */
 
 namespace Zend\Mail\Header;
 
-use Zend\Mail\Header;
+use Zend\Mail\Headers;
 
 /**
  * @category   Zend
  * @package    Zend_Mail
  * @subpackage Header
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
-class ContentType implements Header
+class ContentType implements HeaderInterface
 {
-    /**
-     * Header encoding
-     * 
-     * @var string
-     */
-    protected $encoding = 'ASCII';
-
     /**
      * @var string
      */
@@ -49,23 +29,17 @@ class ContentType implements Header
      */
     protected $parameters = array();
 
-    /**
-     * Factory: create Content-Type header object from string
-     * 
-     * @param  string $headerLine 
-     * @return ContentType
-     */
     public static function fromString($headerLine)
     {
-        $headerLine = iconv_mime_decode($headerLine, ICONV_MIME_DECODE_CONTINUE_ON_ERROR);
-        list($name, $value) = preg_split('#: #', $headerLine, 2);
+        $headerLine = iconv_mime_decode($headerLine, ICONV_MIME_DECODE_CONTINUE_ON_ERROR, 'UTF-8');
+        list($name, $value) = explode(': ', $headerLine, 2);
 
         // check to ensure proper header type for this factory
         if (strtolower($name) !== 'content-type') {
             throw new Exception\InvalidArgumentException('Invalid header line for Content-Type string');
         }
 
-        $value  = str_replace("\r\n ", " ", $value);
+        $value  = str_replace(Headers::FOLDING, " ", $value);
         $values = preg_split('#\s*;\s*#', $value);
         $type   = array_shift($values);
 
@@ -74,31 +48,21 @@ class ContentType implements Header
 
         if (count($values)) {
             foreach ($values as $keyValuePair) {
-                list($key, $value) = preg_split('/=/', $keyValuePair);
-                $value = trim($value, "\"\' \t\n\r\0\x0B");
+                list($key, $value) = explode('=', $keyValuePair, 2);
+                $value = trim($value, "'\" \t\n\r\0\x0B");
                 $header->addParameter($key, $value);
             }
         }
-        
+
         return $header;
     }
 
-    /**
-     * Get header name
-     * 
-     * @return string
-     */
     public function getFieldName()
     {
         return 'Content-Type';
     }
 
-    /**
-     * Get header value
-     * 
-     * @return string
-     */
-    public function getFieldValue()
+    public function getFieldValue($format = HeaderInterface::FORMAT_RAW)
     {
         $prepared = $this->type;
         if (empty($this->parameters)) {
@@ -109,51 +73,36 @@ class ContentType implements Header
         foreach ($this->parameters as $attribute => $value) {
             $values[] = sprintf('%s="%s"', $attribute, $value);
         }
-        $value = implode(";\r\n ", $values);
-        return $value;
+
+        return implode(';' . Headers::FOLDING, $values);
     }
 
-    /**
-     * Set header encoding
-     * 
-     * @param  string $encoding 
-     * @return ContentType
-     */
-    public function setEncoding($encoding) 
+    public function setEncoding($encoding)
     {
-        $this->encoding = $encoding;
+        // This header must be always in US-ASCII
         return $this;
     }
 
-    /**
-     * Get header encoding
-     * 
-     * @return string
-     */
     public function getEncoding()
     {
-        return $this->encoding;
+        return 'ASCII';
     }
 
-    /**
-     * Serialize header to string
-     * 
-     * @return string
-     */
     public function toString()
     {
-        return 'Content-Type: ' . $this->getFieldValue() . "\r\n";
+        return 'Content-Type: ' . $this->getFieldValue();
     }
 
     /**
      * Set the content type
-     * 
-     * @param  string $type 
+     *
+     * @param  string $type
+     * @throws Exception\InvalidArgumentException
      * @return ContentType
      */
     public function setType($type)
     {
-        if (!preg_match('/^[a-z_-]+\/[a-z_-]+$/i', $type)) {
+        if (!preg_match('/^[a-z-]+\/[a-z0-9.+-]+$/i', $type)) {
             throw new Exception\InvalidArgumentException(sprintf(
                 '%s expects a value in the format "type/subtype"; received "%s"',
                 __METHOD__,
@@ -166,8 +115,8 @@ class ContentType implements Header
 
     /**
      * Retrieve the content type
-     * 
-     * @return void
+     *
+     * @return string
      */
     public function getType()
     {
@@ -176,9 +125,9 @@ class ContentType implements Header
 
     /**
      * Add a parameter pair
-     * 
-     * @param  string $name 
-     * @param  string $value 
+     *
+     * @param  string $name
+     * @param  string $value
      * @return ContentType
      */
     public function addParameter($name, $value)
@@ -190,7 +139,7 @@ class ContentType implements Header
 
     /**
      * Get all parameters
-     * 
+     *
      * @return array
      */
     public function getParameters()
@@ -200,8 +149,8 @@ class ContentType implements Header
 
     /**
      * Get a parameter by name
-     * 
-     * @param  string $name 
+     *
+     * @param  string $name
      * @return null|string
      */
     public function getParameter($name)
@@ -215,8 +164,8 @@ class ContentType implements Header
 
     /**
      * Remove a named parameter
-     * 
-     * @param  string $name 
+     *
+     * @param  string $name
      * @return bool
      */
     public function removeParameter($name)

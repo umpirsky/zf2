@@ -1,34 +1,23 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_View
- * @subpackage Helper
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_View
  */
 
-/**
- * @namespace
- */
 namespace Zend\View\Helper\Navigation;
 
-use RecursiveIteratorIterator,
-    Zend\Navigation,
-    Zend\Navigation\Page\AbstractPage,
-    Zend\View,
-    Zend\View\Exception;
+use RecursiveIteratorIterator;
+use Traversable;
+use Zend\Navigation\AbstractContainer;
+use Zend\Navigation\Page\AbstractPage;
+use Zend\Stdlib\ArrayUtils;
+use Zend\Stdlib\ErrorHandler;
+use Zend\View;
+use Zend\View\Exception;
 
 /**
  * Helper for printing <link> elements
@@ -36,8 +25,6 @@ use RecursiveIteratorIterator,
  * @category   Zend
  * @package    Zend_View
  * @subpackage Helper
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 class Links extends AbstractHelper
 {
@@ -105,18 +92,17 @@ class Links extends AbstractHelper
      *
      * @see _findRoot()
      *
-     * @var Navigation\Container
+     * @var AbstractContainer
      */
     protected $root;
 
     /**
-     * View helper entry point:
-     * Retrieves helper and optionally sets container to operate on
+     * Helper entry point
      *
-     * @param  Navigation\Container $container [optional] container to operate on
-     * @return Links     fluent interface, returns self
+     * @param  string|AbstractContainer $container container to operate on
+     * @return Links
      */
-    public function __invoke(Navigation\Container $container = null)
+    public function __invoke($container = null)
     {
         if (null !== $container) {
             $this->setContainer($container);
@@ -138,11 +124,15 @@ class Links extends AbstractHelper
      *
      * @param  string $method             method name
      * @param  array  $arguments          method arguments
-     * @throws Navigation\Exception  if method does not exist in container
+     * @return mixed
+     * @throws Exception\ExceptionInterface  if method does not exist in container
      */
     public function __call($method, array $arguments = array())
     {
-        if (@preg_match('/find(Rel|Rev)(.+)/', $method, $match)) {
+        ErrorHandler::start(E_WARNING);
+        $result = preg_match('/find(Rel|Rev)(.+)/', $method, $match);
+        ErrorHandler::stop();
+        if ($result) {
             return $this->findRelation($arguments[0],
                                        strtolower($match[1]),
                                        strtolower($match[2]));
@@ -150,8 +140,6 @@ class Links extends AbstractHelper
 
         return parent::__call($method, $arguments);
     }
-
-    // Accessors:
 
     /**
      * Sets the helper's render flag
@@ -220,10 +208,10 @@ class Links extends AbstractHelper
      * </code>
      *
      * @param  AbstractPage $page  page to find links for
+     * @param null|int $flag
      * @return array related pages
      */
-    public function findAllRelations(AbstractPage $page,
-                                     $flag = null)
+    public function findAllRelations(AbstractPage $page, $flag = null)
     {
         if (!is_int($flag)) {
             $flag = self::RENDER_ALL;
@@ -614,7 +602,7 @@ class Links extends AbstractHelper
      * to the render method.
      *
      * @param  AbstractPage $page  page to find root for
-     * @return Navigation\Container   the root container of the given page
+     * @return AbstractContainer   the root container of the given page
      */
     protected function findRoot(AbstractPage $page)
     {
@@ -646,28 +634,27 @@ class Links extends AbstractHelper
      */
     protected function convertToPages($mixed, $recursive = true)
     {
-        if (is_object($mixed)) {
-            if ($mixed instanceof AbstractPage) {
-                // value is a page instance; return directly
-                return $mixed;
-            } elseif ($mixed instanceof Navigation\Container) {
-                // value is a container; return pages in it
-                $pages = array();
-                foreach ($mixed as $page) {
-                    $pages[] = $page;
-                }
-                return $pages;
-            } elseif ($mixed instanceof \Zend\Config\Config) {
-                // convert config object to array and extract
-                return $this->convertToPages($mixed->toArray(), $recursive);
+        if ($mixed instanceof AbstractPage) {
+            // value is a page instance; return directly
+            return $mixed;
+        } elseif ($mixed instanceof AbstractContainer) {
+            // value is a container; return pages in it
+            $pages = array();
+            foreach ($mixed as $page) {
+                $pages[] = $page;
             }
+            return $pages;
+        } elseif ($mixed instanceof Traversable) {
+            $mixed = ArrayUtils::iteratorToArray($mixed);
         } elseif (is_string($mixed)) {
             // value is a string; make an URI page
             return AbstractPage::factory(array(
                 'type' => 'uri',
                 'uri'  => $mixed
             ));
-        } elseif (is_array($mixed) && !empty($mixed)) {
+        }
+
+        if (is_array($mixed) && !empty($mixed)) {
             if ($recursive && is_numeric(key($mixed))) {
                 // first key is numeric; assume several pages
                 $pages = array();
@@ -731,7 +718,7 @@ class Links extends AbstractHelper
         );
 
         return '<link' .
-               $this->_htmlAttribs($attribs) .
+               $this->htmlAttribs($attribs) .
                $this->getClosingBracket();
     }
 
@@ -740,16 +727,17 @@ class Links extends AbstractHelper
     /**
      * Renders helper
      *
-     * Implements {@link Helper::render()}.
+     * Implements {@link HelperInterface::render()}.
      *
-     * @param  Navigation\Container $container [optional] container to render. 
-     *                                         Default is to render the 
-     *                                         container registered in the 
+     * @param  AbstractContainer|string|null $container [optional] container to render.
+     *                                         Default is to render the
+     *                                         container registered in the
      *                                         helper.
      * @return string                          helper output
      */
-    public function render(Navigation\Container $container = null)
+    public function render($container = null)
     {
+        $this->parseContainer($container);
         if (null === $container) {
             $container = $this->getContainer();
         }

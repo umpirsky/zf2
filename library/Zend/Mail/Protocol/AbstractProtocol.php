@@ -1,43 +1,23 @@
 <?php
-
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Mail
- * @subpackage Protocol
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Mail
  */
 
-/**
- * @namespace
- */
 namespace Zend\Mail\Protocol;
 
-use Zend\Validator\Hostname as HostnameValidator,
-    Zend\Validator;
+use Zend\Validator;
 
 /**
- * Zend_Mail_Protocol_Abstract
- *
  * Provides low-level methods for concrete adapters to communicate with a remote mail server and track requests and responses.
  *
  * @category   Zend
  * @package    Zend_Mail
  * @subpackage Protocol
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  * @todo Implement proxy settings
  */
 abstract class AbstractProtocol
@@ -57,64 +37,56 @@ abstract class AbstractProtocol
      * Maximum of the transaction log
      * @var integer
      */
-    protected $_maximumLog = 64;
+    protected $maximumLog = 64;
 
 
     /**
      * Hostname or IP address of remote server
      * @var string
      */
-    protected $_host;
+    protected $host;
 
 
     /**
      * Port number of connection
      * @var integer
      */
-    protected $_port;
+    protected $port;
 
 
     /**
      * Instance of Zend\Validator\ValidatorChain to check hostnames
-     * @var Validator\ValidatorChain
+     * @var \Zend\Validator\ValidatorChain
      */
-    protected $_validHost;
+    protected $validHost;
 
 
     /**
      * Socket connection resource
      * @var resource
      */
-    protected $_socket;
+    protected $socket;
 
 
     /**
      * Last request sent to server
      * @var string
      */
-    protected $_request;
+    protected $request;
 
 
     /**
      * Array of server responses to last request
      * @var array
      */
-    protected $_response;
-
-
-    /**
-     * String template for parsing server responses using sscanf (default: 3 digit code and response string)
-     * @var resource
-     * @deprecated Since 1.10.3
-     */
-    protected $_template = '%d%s';
+    protected $response;
 
 
     /**
      * Log of mail requests and server responses for a session
      * @var array
      */
-    private $_log = array();
+    private $log = array();
 
 
     /**
@@ -123,26 +95,24 @@ abstract class AbstractProtocol
      * @param  string  $host OPTIONAL Hostname of remote connection (default: 127.0.0.1)
      * @param  integer $port OPTIONAL Port number (default: null)
      * @throws Exception\RuntimeException
-     * @return void
      */
     public function __construct($host = '127.0.0.1', $port = null)
     {
-        $this->_validHost = new Validator\ValidatorChain();
-        $this->_validHost->addValidator(new HostnameValidator(HostnameValidator::ALLOW_ALL));
+        $this->validHost = new Validator\ValidatorChain();
+        $this->validHost->addValidator(new Validator\Hostname(Validator\Hostname::ALLOW_ALL));
 
-        if (!$this->_validHost->isValid($host)) {
-            throw new Exception\RuntimeException(implode(', ', $this->_validHost->getMessages()));
+        if (!$this->validHost->isValid($host)) {
+            throw new Exception\RuntimeException(implode(', ', $this->validHost->getMessages()));
         }
 
-        $this->_host = $host;
-        $this->_port = $port;
+        $this->host = $host;
+        $this->port = $port;
     }
 
 
     /**
      * Class destructor to cleanup open resources
      *
-     * @return void
      */
     public function __destruct()
     {
@@ -150,27 +120,26 @@ abstract class AbstractProtocol
     }
 
     /**
-     * Set the maximum log size 
-     * 
+     * Set the maximum log size
+     *
      * @param integer $maximumLog Maximum log size
-     * @return void
      */
     public function setMaximumLog($maximumLog)
     {
-        $this->_maximumLog = (int) $maximumLog;
+        $this->maximumLog = (int) $maximumLog;
     }
-    
-    
+
+
     /**
-     * Get the maximum log size 
-     * 
+     * Get the maximum log size
+     *
      * @return int the maximum log size
      */
     public function getMaximumLog()
     {
-        return $this->_maximumLog;
+        return $this->maximumLog;
     }
-    
+
 
     /**
      * Create a connection to the remote host
@@ -187,7 +156,7 @@ abstract class AbstractProtocol
      */
     public function getRequest()
     {
-        return $this->_request;
+        return $this->request;
     }
 
 
@@ -198,7 +167,7 @@ abstract class AbstractProtocol
      */
     public function getResponse()
     {
-        return $this->_response;
+        return $this->response;
     }
 
 
@@ -209,33 +178,31 @@ abstract class AbstractProtocol
      */
     public function getLog()
     {
-        return implode('', $this->_log);
+        return implode('', $this->log);
     }
 
 
     /**
      * Reset the transaction log
      *
-     * @return void
      */
     public function resetLog()
     {
-        $this->_log = array();
+        $this->log = array();
     }
 
     /**
      * Add the transaction log
      *
-     * @param  string new transaction
-     * @return void
+     * @param  string $value new transaction
      */
     protected function _addLog($value)
     {
-        if ($this->_maximumLog >= 0 && count($this->_log) >= $this->_maximumLog) {
-            array_shift($this->_log);
+        if ($this->maximumLog >= 0 && count($this->log) >= $this->maximumLog) {
+            array_shift($this->log);
         }
 
-        $this->_log[] = $value;
+        $this->log[] = $value;
     }
 
     /**
@@ -253,16 +220,16 @@ abstract class AbstractProtocol
         $errorStr = '';
 
         // open connection
-        $this->_socket = @stream_socket_client($remote, $errorNum, $errorStr, self::TIMEOUT_CONNECTION);
+        $this->socket = @stream_socket_client($remote, $errorNum, $errorStr, self::TIMEOUT_CONNECTION);
 
-        if ($this->_socket === false) {
+        if ($this->socket === false) {
             if ($errorNum == 0) {
                 $errorStr = 'Could not open socket';
             }
             throw new Exception\RuntimeException($errorStr);
         }
 
-        if (($result = stream_set_timeout($this->_socket, self::TIMEOUT_CONNECTION)) === false) {
+        if (($result = stream_set_timeout($this->socket, self::TIMEOUT_CONNECTION)) === false) {
             throw new Exception\RuntimeException('Could not set stream timeout');
         }
 
@@ -273,12 +240,11 @@ abstract class AbstractProtocol
     /**
      * Disconnect from remote host and free resource
      *
-     * @return void
      */
     protected function _disconnect()
     {
-        if (is_resource($this->_socket)) {
-            fclose($this->_socket);
+        if (is_resource($this->socket)) {
+            fclose($this->socket);
         }
     }
 
@@ -292,19 +258,19 @@ abstract class AbstractProtocol
      */
     protected function _send($request)
     {
-        if (!is_resource($this->_socket)) {
-            throw new Exception\RuntimeException('No connection has been established to ' . $this->_host);
+        if (!is_resource($this->socket)) {
+            throw new Exception\RuntimeException('No connection has been established to ' . $this->host);
         }
 
-        $this->_request = $request;
+        $this->request = $request;
 
-        $result = fwrite($this->_socket, $request . self::EOL);
+        $result = fwrite($this->socket, $request . self::EOL);
 
         // Save request to internal log
         $this->_addLog($request . self::EOL);
 
         if ($result === false) {
-            throw new Exception\RuntimeException('Could not send request to ' . $this->_host);
+            throw new Exception\RuntimeException('Could not send request to ' . $this->host);
         }
 
         return $result;
@@ -314,39 +280,39 @@ abstract class AbstractProtocol
     /**
      * Get a line from the stream.
      *
-     * @var    integer $timeout Per-request timeout value if applicable
+     * @param  integer $timeout Per-request timeout value if applicable
      * @throws Exception\RuntimeException
      * @return string
      */
     protected function _receive($timeout = null)
     {
-        if (!is_resource($this->_socket)) {
-            throw new Exception\RuntimeException('No connection has been established to ' . $this->_host);
+        if (!is_resource($this->socket)) {
+            throw new Exception\RuntimeException('No connection has been established to ' . $this->host);
         }
 
         // Adapters may wish to supply per-commend timeouts according to appropriate RFC
         if ($timeout !== null) {
-           stream_set_timeout($this->_socket, $timeout);
+           stream_set_timeout($this->socket, $timeout);
         }
 
         // Retrieve response
-        $reponse = fgets($this->_socket, 1024);
+        $response = fgets($this->socket, 1024);
 
         // Save request to internal log
-        $this->_addLog($reponse);
+        $this->_addLog($response);
 
         // Check meta data to ensure connection is still valid
-        $info = stream_get_meta_data($this->_socket);
+        $info = stream_get_meta_data($this->socket);
 
         if (!empty($info['timed_out'])) {
-            throw new Exception\RuntimeException($this->_host . ' has timed out');
+            throw new Exception\RuntimeException($this->host . ' has timed out');
         }
 
-        if ($reponse === false) {
-            throw new Exception\RuntimeException('Could not read from ' . $this->_host);
+        if ($response === false) {
+            throw new Exception\RuntimeException('Could not read from ' . $this->host);
         }
 
-        return $reponse;
+        return $response;
     }
 
 
@@ -357,12 +323,13 @@ abstract class AbstractProtocol
      * Throws a Zend_Mail_Protocol_Exception if an unexpected code is returned.
      *
      * @param  string|array $code One or more codes that indicate a successful response
+     * @param  integer $timeout Per-request timeout value if applicable
      * @throws Exception\RuntimeException
      * @return string Last line of response string
      */
     protected function _expect($code, $timeout = null)
     {
-        $this->_response = array();
+        $this->response = array();
         $cmd  = '';
         $more = '';
         $msg  = '';
@@ -373,7 +340,7 @@ abstract class AbstractProtocol
         }
 
         do {
-            $this->_response[] = $result = $this->_receive($timeout);
+            $this->response[] = $result = $this->_receive($timeout);
             list($cmd, $more, $msg) = preg_split('/([\s-]+)/', $result, 2, PREG_SPLIT_DELIM_CAPTURE);
 
             if ($errMsg !== '') {

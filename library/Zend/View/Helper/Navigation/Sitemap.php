@@ -1,36 +1,23 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_View
- * @subpackage Helper
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_View
  */
 
-/**
- * @namespace
- */
 namespace Zend\View\Helper\Navigation;
 
-use DOMDocument,
-    RecursiveIteratorIterator,
-    Zend\Navigation\Page\AbstractPage,
-    Zend\Navigation\Container,
-    Zend\Uri,
-    Zend\View,
-    Zend\View\Exception;
+use DOMDocument;
+use RecursiveIteratorIterator;
+use Zend\Navigation\AbstractContainer;
+use Zend\Navigation\Page\AbstractPage;
+use Zend\Stdlib\ErrorHandler;
+use Zend\Uri;
+use Zend\View;
+use Zend\View\Exception;
 
 /**
  * Helper for printing sitemaps
@@ -40,8 +27,6 @@ use DOMDocument,
  * @category   Zend
  * @package    Zend_View
  * @subpackage Helper
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 class Sitemap extends AbstractHelper
 {
@@ -95,13 +80,19 @@ class Sitemap extends AbstractHelper
     protected $serverUrl;
 
     /**
-     * View helper entry point:
-     * Retrieves helper and optionally sets container to operate on
+     * List of urls in the sitemap
      *
-     * @param  Container $container  [optional] container to operate on
-     * @return Sitemap   fluent interface, returns self
+     * @var array
      */
-    public function __invoke(Container $container = null)
+    protected $urls = array();
+
+    /**
+     * Helper entry point
+     *
+     * @param  string|AbstractContainer $container container to operate on
+     * @return Sitemap
+     */
+    public function __invoke($container = null)
     {
         if (null !== $container) {
             $this->setContainer($container);
@@ -109,8 +100,6 @@ class Sitemap extends AbstractHelper
 
         return $this;
     }
-
-    // Accessors:
 
     /**
      * Sets whether XML output should be formatted
@@ -137,8 +126,8 @@ class Sitemap extends AbstractHelper
     /**
      * Sets whether the XML declaration should be used in output
      *
-     * @param  bool $useXmlDecl whether XML delcaration should be rendered
-     * @returnSitemap  fluent interface, returns self
+     * @param  bool $useXmlDecl whether XML declaration should be rendered
+     * @return Sitemap  fluent interface, returns self
      */
     public function setUseXmlDeclaration($useXmlDecl)
     {
@@ -160,7 +149,7 @@ class Sitemap extends AbstractHelper
      * Sets whether sitemap should be validated using Zend\Validate\Sitemap_*
      *
      * @param  bool $useSitemapValidators whether sitemap validators should be used
-     * @returnSitemap  fluent interface, returns self
+     * @return Sitemap  fluent interface, returns self
      */
     public function setUseSitemapValidators($useSitemapValidators)
     {
@@ -182,7 +171,7 @@ class Sitemap extends AbstractHelper
      * Sets whether sitemap should be schema validated when generated
      *
      * @param  bool $schemaValidation whether sitemap should validated using XSD Schema
-     * @returnSitemap  fluent interface, returns self
+     * @return Sitemap
      */
     public function setUseSchemaValidation($schemaValidation)
     {
@@ -253,14 +242,8 @@ class Sitemap extends AbstractHelper
      */
     protected function xmlEscape($string)
     {
-        $enc = 'UTF-8';
-        if ($this->view instanceof View\Renderer
-            && method_exists($this->view, 'getEncoding')
-        ) {
-            $enc = $this->view->getEncoding();
-        }
-
-        return htmlspecialchars($string, ENT_QUOTES, $enc, false);
+        $escaper = $this->view->plugin('escapeHtml');
+        return $escaper($string);
     }
 
     // Public methods:
@@ -290,17 +273,23 @@ class Sitemap extends AbstractHelper
             $curDoc         = $basePathHelper();
             $curDoc         = ('/' == $curDoc) ? '' : trim($curDoc, '/');
             $url            = rtrim($this->getServerUrl(), '/') . '/'
-                            . $curDoc
-                            . (empty($curDoc) ? '' : '/') . $href;
+                                                                . $curDoc
+                                                                . (empty($curDoc) ? '' : '/') . $href;
         }
 
-        return $this->xmlEscape($url);
+        if (! in_array($url, $this->urls)) {
+
+            $this->urls[] = $url;
+            return $this->xmlEscape($url);
+        }
+
+        return null;
     }
 
     /**
      * Returns a DOMDocument containing the Sitemap XML for the given container
      *
-     * @param  Container                 $container  [optional] container to get
+     * @param  AbstractContainer                 $container  [optional] container to get
      *                                               breadcrumbs from, defaults
      *                                               to what is registered in the
      *                                               helper
@@ -313,8 +302,11 @@ class Sitemap extends AbstractHelper
      *                                               validators are used and the
      *                                               loc element fails validation
      */
-    public function getDomSitemap(Container $container = null)
+    public function getDomSitemap(AbstractContainer $container = null)
     {
+        // Reset the urls
+        $this->urls = array();
+
         if (null === $container) {
             $container = $this->getContainer();
         }
@@ -359,6 +351,7 @@ class Sitemap extends AbstractHelper
             // get absolute url from page
             if (!$url = $this->url($page)) {
                 // skip page if it has no url (rare case)
+                // or already is in the sitemap
                 continue;
             }
 
@@ -370,14 +363,14 @@ class Sitemap extends AbstractHelper
                 && !$locValidator->isValid($url)
             ) {
                 throw new Exception\RuntimeException(sprintf(
-                        'Encountered an invalid URL for Sitemap XML: "%s"',
-                        $url
+                    'Encountered an invalid URL for Sitemap XML: "%s"',
+                    $url
                 ));
             }
 
             // put url in 'loc' element
             $urlNode->appendChild($dom->createElementNS(self::SITEMAP_NS,
-                                                        'loc', $url));
+                    'loc', $url));
 
             // add 'lastmod' element if a valid lastmod is set in page
             if (isset($page->lastmod)) {
@@ -392,7 +385,7 @@ class Sitemap extends AbstractHelper
                     $lastmodValidator->isValid($lastmod)) {
                     $urlNode->appendChild(
                         $dom->createElementNS(self::SITEMAP_NS, 'lastmod',
-                                              $lastmod)
+                            $lastmod)
                     );
                 }
             }
@@ -404,7 +397,7 @@ class Sitemap extends AbstractHelper
                     $changefreqValidator->isValid($changefreq)) {
                     $urlNode->appendChild(
                         $dom->createElementNS(self::SITEMAP_NS, 'changefreq',
-                                              $changefreq)
+                            $changefreq)
                     );
                 }
             }
@@ -416,7 +409,7 @@ class Sitemap extends AbstractHelper
                     $priorityValidator->isValid($priority)) {
                     $urlNode->appendChild(
                         $dom->createElementNS(self::SITEMAP_NS, 'priority',
-                                              $priority)
+                            $priority)
                     );
                 }
             }
@@ -424,11 +417,14 @@ class Sitemap extends AbstractHelper
 
         // validate using schema if specified
         if ($this->getUseSchemaValidation()) {
-            if (!@$dom->schemaValidate(self::SITEMAP_XSD)) {
+            ErrorHandler::start();
+            $test  = $dom->schemaValidate(self::SITEMAP_XSD);
+            $error = ErrorHandler::stop();
+            if (!$test) {
                 throw new Exception\RuntimeException(sprintf(
-                        'Sitemap is invalid according to XML Schema at "%s"',
-                        self::SITEMAP_XSD
-                ));
+                    'Sitemap is invalid according to XML Schema at "%s"',
+                    self::SITEMAP_XSD
+                ), 0, $error);
             }
         }
 
@@ -440,20 +436,19 @@ class Sitemap extends AbstractHelper
     /**
      * Renders helper
      *
-     * Implements {@link Helper::render()}.
+     * Implements {@link HelperInterface::render()}.
      *
-     * @param  Container $container [optional] container to render. Default is 
-     *                              to render the container registered in the 
-     *                              helper.
-     * @return string               helper output
+     * @param  AbstractContainer $container [optional] container to render. Default is
+     *                           to render the container registered in the
+     *                           helper.
+     * @return string            helper output
      */
-    public function render(Container $container = null)
+    public function render($container = null)
     {
         $dom = $this->getDomSitemap($container);
-
         $xml = $this->getUseXmlDeclaration() ?
-               $dom->saveXML() :
-               $dom->saveXML($dom->documentElement);
+            $dom->saveXML() :
+            $dom->saveXML($dom->documentElement);
 
         return rtrim($xml, PHP_EOL);
     }

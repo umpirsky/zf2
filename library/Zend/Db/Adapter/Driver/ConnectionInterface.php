@@ -1,22 +1,11 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Db
- * @subpackage Adapter
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Db
  */
 
 namespace Zend\Db\Adapter\Driver;
@@ -25,21 +14,78 @@ namespace Zend\Db\Adapter\Driver;
  * @category   Zend
  * @package    Zend_Db
  * @subpackage Adapter
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 interface ConnectionInterface
 {
-    public function getDefaultCatalog();
-    public function getDefaultSchema();
-    public function getResource();
-    public function connect();
-    public function isConnected();
-    public function disconnect();
-    public function beginTransaction();
-    public function commit();
-    public function rollback();
-    public function execute($sql); // return result set
+    /**
+     * Get current schema
+     *
+     * @return string
+     */
+    public function getCurrentSchema();
 
-    public function getLastGeneratedId();
+    /**
+     * Get resource
+     *
+     * @return mixed
+     */
+    public function getResource();
+
+    /**
+     * Connect
+     *
+     * @return ConnectionInterface
+     */
+    public function connect();
+
+    /**
+     * Is connected
+     *
+     * @return bool
+     */
+    public function isConnected();
+
+    /**
+     * Disconnect
+     *
+     * @return ConnectionInterface
+     */
+    public function disconnect();
+
+    /**
+     * Begin transaction
+     *
+     * @return ConnectionInterface
+     */
+    public function beginTransaction();
+
+    /**
+     * Commit
+     *
+     * @return ConnectionInterface
+     */
+    public function commit();
+
+    /**
+     * Rollback
+     *
+     * @return ConnectionInterface
+     */
+    public function rollback();
+
+    /**
+     * Execute
+     *
+     * @param  string $sql
+     * @return ResultInterface
+     */
+    public function execute($sql);
+
+    /**
+     * Get last generated id
+     *
+     * @param  null $name Ignored
+     * @return integer
+     */
+    public function getLastGeneratedValue($name = null);
 }

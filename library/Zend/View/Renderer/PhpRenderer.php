@@ -1,51 +1,38 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_View
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_View
  */
 
-/**
- * @namespace
- */
 namespace Zend\View\Renderer;
 
-use ArrayAccess,
-    Zend\Filter\FilterChain,
-    Zend\Loader\Pluggable,
-    Zend\View\Exception,
-    Zend\View\HelperBroker,
-    Zend\View\Model,
-    Zend\View\Renderer,
-    Zend\View\Resolver,
-    Zend\View\Variables;
+use ArrayAccess;
+use Traversable;
+use Zend\Filter\FilterChain;
+use Zend\View\Exception;
+use Zend\View\HelperPluginManager;
+use Zend\View\Helper\AbstractHelper;
+use Zend\View\Model\ModelInterface as Model;
+use Zend\View\Renderer\RendererInterface as Renderer;
+use Zend\View\Resolver\ResolverInterface as Resolver;
+use Zend\View\Resolver\TemplatePathStack;
+use Zend\View\Variables;
 
 /**
  * Abstract class for Zend_View to help enforce private constructs.
  *
  * Note: all private variables in this class are prefixed with "__". This is to
- * mark them as part of the internal implementation, and thus prevent conflict 
+ * mark them as part of the internal implementation, and thus prevent conflict
  * with variables injected into the renderer.
  *
  * @category   Zend
  * @package    Zend_View
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
-class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
+class PhpRenderer implements Renderer, TreeRendererInterface
 {
     /**
      * @var string Rendered content
@@ -59,7 +46,7 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
 
     /**
      * Template being rendered
-     * 
+     *
      * @var null|string
      */
     private $__template = null;
@@ -85,14 +72,14 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
     private $__file = null;
 
     /**
-     * Helper broker
+     * Helper plugin manager
      *
-     * @var HelperBroker
+     * @var HelperPluginManager
      */
-    private $__helperBroker;
+    private $__helpers;
 
     /**
-     * @var Zend\Filter\FilterChain
+     * @var FilterChain
      */
     private $__filterChain;
 
@@ -110,7 +97,7 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
      * Constructor.
      *
      *
-     * @todo handle passing helper broker, options
+     * @todo handle passing helper plugin manager, options
      * @todo handle passing filter chain, options
      * @todo handle passing variables object, options
      * @todo handle passing resolver object, options
@@ -147,8 +134,8 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
 
     /**
      * Set script resolver
-     * 
-     * @param  Resolver $resolver 
+     *
+     * @param  Resolver $resolver
      * @return PhpRenderer
      * @throws Exception\InvalidArgumentException
      */
@@ -160,14 +147,14 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
 
     /**
      * Retrieve template name or template resolver
-     * 
-     * @param  null|string $name 
+     *
+     * @param  null|string $name
      * @return string|Resolver
      */
     public function resolver($name = null)
     {
         if (null === $this->__templateResolver) {
-            $this->setResolver(new Resolver\TemplatePathStack());
+            $this->setResolver(new TemplatePathStack());
         }
 
         if (null !== $name) {
@@ -181,8 +168,8 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
      * Set variable storage
      *
      * Expects either an array, or an object implementing ArrayAccess.
-     * 
-     * @param  array|ArrayAccess $variables 
+     *
+     * @param  array|ArrayAccess $variables
      * @return PhpRenderer
      * @throws Exception\InvalidArgumentException
      */
@@ -194,7 +181,7 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
                 (is_object($variables) ? get_class($variables) : gettype($variables))
             ));
         }
-        
+
         // Enforce a Variables container
         if (!$variables instanceof Variables) {
             $variablesAsArray = array();
@@ -210,8 +197,8 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
 
     /**
      * Get a single variable, or all variables
-     * 
-     * @param  mixed $key 
+     *
+     * @param  mixed $key
      * @return mixed
      */
     public function vars($key = null)
@@ -228,8 +215,8 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
 
     /**
      * Get a single variable
-     * 
-     * @param  mixed $key 
+     *
+     * @param  mixed $key
      * @return mixed
      */
     public function get($key)
@@ -243,8 +230,8 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
 
     /**
      * Overloading: proxy to Variables container
-     * 
-     * @param  string $name 
+     *
+     * @param  string $name
      * @return mixed
      */
     public function __get($name)
@@ -255,9 +242,9 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
 
     /**
      * Overloading: proxy to Variables container
-     * 
-     * @param  string $name 
-     * @param  mixed $value 
+     *
+     * @param  string $name
+     * @param  mixed $value
      * @return void
      */
     public function __set($name, $value)
@@ -268,8 +255,8 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
 
     /**
      * Overloading: proxy to Variables container
-     * 
-     * @param  string $name 
+     *
+     * @param  string $name
      * @return bool
      */
     public function __isset($name)
@@ -280,8 +267,8 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
 
     /**
      * Overloading: proxy to Variables container
-     * 
-     * @param  string $name 
+     *
+     * @param  string $name
      * @return void
      */
     public function __unset($name)
@@ -294,69 +281,71 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
     }
 
     /**
-     * Set plugin broker instance
-     * 
-     * @param  string|HelperBroker $broker 
-     * @return Zend\View\Abstract
+     * Set helper plugin manager instance
+     *
+     * @param  string|HelperPluginManager $helpers
+     * @return PhpRenderer
      * @throws Exception\InvalidArgumentException
      */
-    public function setBroker($broker)
+    public function setHelperPluginManager($helpers)
     {
-        if (is_string($broker)) {
-            if (!class_exists($broker)) {
+        if (is_string($helpers)) {
+            if (!class_exists($helpers)) {
                 throw new Exception\InvalidArgumentException(sprintf(
-                    'Invalid helper broker class provided (%s)',
-                    $broker
+                    'Invalid helper helpers class provided (%s)',
+                    $helpers
                 ));
             }
-            $broker = new $broker();
+            $helpers = new $helpers();
         }
-        if (!$broker instanceof HelperBroker) {
+        if (!$helpers instanceof HelperPluginManager) {
             throw new Exception\InvalidArgumentException(sprintf(
-                'Helper broker must extend Zend\View\HelperBroker; got type "%s" instead',
-                (is_object($broker) ? get_class($broker) : gettype($broker))
+                'Helper helpers must extend Zend\View\HelperPluginManager; got type "%s" instead',
+                (is_object($helpers) ? get_class($helpers) : gettype($helpers))
             ));
         }
-        $broker->setView($this);
-        $this->__helperBroker = $broker;
+        $helpers->setRenderer($this);
+        $this->__helpers = $helpers;
+
+        return $this;
     }
 
     /**
-     * Get plugin broker instance
-     * 
-     * @return HelperBroker
+     * Get helper plugin manager instance
+     *
+     * @return HelperPluginManager
      */
-    public function getBroker()
+    public function getHelperPluginManager()
     {
-        if (null === $this->__helperBroker) {
-            $this->setBroker(new HelperBroker());
+        if (null === $this->__helpers) {
+            $this->setHelperPluginManager(new HelperPluginManager());
         }
-        return $this->__helperBroker;
+        return $this->__helpers;
     }
-    
+
     /**
      * Get plugin instance
-     * 
-     * @param  string     $plugin  Name of plugin to return
+     *
+     * @param  string     $name Name of plugin to return
      * @param  null|array $options Options to pass to plugin constructor (if not already instantiated)
-     * @return Helper
+     * @return AbstractHelper
      */
     public function plugin($name, array $options = null)
     {
-        return $this->getBroker()->load($name, $options);
+        return $this->getHelperPluginManager()->get($name, $options);
     }
 
     /**
      * Overloading: proxy to helpers
      *
-     * Proxies to the attached plugin broker to retrieve, return, and potentially
+     * Proxies to the attached plugin manager to retrieve, return, and potentially
      * execute helpers.
      *
      * * If the helper does not define __invoke, it will be returned
      * * If the helper does define __invoke, it will be called as a functor
-     * 
-     * @param  string $method 
-     * @param  array $argv 
+     *
+     * @param  string $method
+     * @param  array $argv
      * @return mixed
      */
     public function __call($method, $argv)
@@ -370,9 +359,9 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
 
     /**
      * Set filter chain
-     * 
-     * @param  FilterChain $filters 
-     * @return Zend\View\PhpRenderer
+     *
+     * @param  FilterChain $filters
+     * @return PhpRenderer
      */
     public function setFilterChain(FilterChain $filters)
     {
@@ -382,7 +371,7 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
 
     /**
      * Retrieve filter chain for post-filtering script content
-     * 
+     *
      * @return FilterChain
      */
     public function getFilterChain()
@@ -396,18 +385,19 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
     /**
      * Processes a view script and returns the output.
      *
-     * @param  string|Model $nameOrModel Either the template to use, or a 
-     *                                   ViewModel. The ViewModel must have the 
-     *                                   template as an option in order to be 
+     * @param  string|Model $nameOrModel Either the template to use, or a
+     *                                   ViewModel. The ViewModel must have the
+     *                                   template as an option in order to be
      *                                   valid.
-     * @param  null|array|Traversable Values to use when rendering. If none 
-     *                                provided, uses those in the composed 
+     * @param  null|array|Traversable $values Values to use when rendering. If none
+     *                                provided, uses those in the composed
      *                                variables container.
      * @return string The script output.
      * @throws Exception\DomainException if a ViewModel is passed, but does not
      *                                   contain a template option.
      * @throws Exception\InvalidArgumentException if the values passed are not
      *                                            an array or ArrayAccess object
+     * @throws Exception\RuntimeException if the template cannot be rendered
      */
     public function render($nameOrModel, $values = null)
     {
@@ -480,12 +470,12 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
     /**
      * Set flag indicating whether or not we should render trees of view models
      *
-     * If set to true, the View instance will not attempt to render children 
+     * If set to true, the View instance will not attempt to render children
      * separately, but instead pass the root view model directly to the PhpRenderer.
-     * It is then up to the developer to render the children from within the 
+     * It is then up to the developer to render the children from within the
      * view script.
-     * 
-     * @param  bool $renderTrees 
+     *
+     * @param  bool $renderTrees
      * @return PhpRenderer
      */
     public function setCanRenderTrees($renderTrees)
@@ -496,7 +486,7 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
 
     /**
      * Can we render trees, or are we configured to do so?
-     * 
+     *
      * @return bool
      */
     public function canRenderTrees()
@@ -506,8 +496,8 @@ class PhpRenderer implements Renderer, Pluggable, TreeRendererInterface
 
     /**
      * Add a template to the stack
-     * 
-     * @param  string $template 
+     *
+     * @param  string $template
      * @return PhpRenderer
      */
     public function addTemplate($template)

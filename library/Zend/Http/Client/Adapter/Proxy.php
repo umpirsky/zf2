@@ -1,30 +1,19 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Http
- * @subpackage Client_Adapter
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Http
  */
 
-/**
- * @namespace
- */
 namespace Zend\Http\Client\Adapter;
-use Zend\Http\Client,
-    Zend\Http\Client\Adapter\Exception as AdapterException;
+
+use Zend\Http\Client;
+use Zend\Http\Client\Adapter\Exception as AdapterException;
+use Zend\Http\Response;
+use Zend\Stdlib\ErrorHandler;
 
 /**
  * HTTP Proxy-supporting Zend_Http_Client adapter class, based on the default
@@ -38,8 +27,6 @@ use Zend\Http\Client,
  * @category   Zend
  * @package    Zend_Http
  * @subpackage Client_Adapter
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 class Proxy extends Socket
 {
@@ -49,16 +36,19 @@ class Proxy extends Socket
      * @var array
      */
     protected $config = array(
-        'ssltransport'  => 'ssl',
-        'sslcert'       => null,
-        'sslpassphrase' => null,
-        'sslusecontext' => false,
-        'proxy_host'    => '',
-        'proxy_port'    => 8080,
-        'proxy_user'    => '',
-        'proxy_pass'    => '',
-        'proxy_auth'    => Client::AUTH_BASIC,
-        'persistent'    => false
+        'ssltransport'       => 'ssl',
+        'sslcert'            => null,
+        'sslpassphrase'      => null,
+        'sslverifypeer'      => true,
+        'sslcapath'          => null,
+        'sslallowselfsigned' => false,
+        'sslusecontext'      => false,
+        'proxy_host'         => '',
+        'proxy_port'         => 8080,
+        'proxy_user'         => '',
+        'proxy_pass'         => '',
+        'proxy_auth'         => Client::AUTH_BASIC,
+        'persistent'         => false
     );
 
     /**
@@ -84,10 +74,10 @@ class Proxy extends Socket
         if (! $this->config['proxy_host']) {
             return parent::connect($host, $port, $secure);
         }
-        
+
         /* Url might require stream context even if proxy connection doesn't */
         if ($secure) {
-        	$this->config['sslusecontext'] = true;
+            $this->config['sslusecontext'] = true;
         }
 
         // Connect (a non-secure connection) to the proxy server
@@ -106,6 +96,7 @@ class Proxy extends Socket
      * @param string        $http_ver
      * @param array         $headers
      * @param string        $body
+     * @throws AdapterException\RuntimeException
      * @return string Request as string
      */
     public function write($method, $uri, $http_ver = '1.1', $headers = array(), $body = '')
@@ -158,7 +149,7 @@ class Proxy extends Socket
             $request .= "$v\r\n";
         }
 
-        if(is_resource($body)) {
+        if (is_resource($body)) {
             $request .= "\r\n";
         } else {
             // Add the request body
@@ -166,16 +157,19 @@ class Proxy extends Socket
         }
 
         // Send the request
-        if (! @fwrite($this->socket, $request)) {
-            throw new AdapterException\RuntimeException("Error writing request to proxy server");
+        ErrorHandler::start();
+        $test  = fwrite($this->socket, $request);
+        $error = ErrorHandler::stop();
+        if (!$test) {
+            throw new AdapterException\RuntimeException("Error writing request to proxy server", 0, $error);
         }
 
         if (is_resource($body)) {
-            if(stream_copy_to_stream($body, $this->socket) == 0) {
+            if (stream_copy_to_stream($body, $this->socket) == 0) {
                 throw new AdapterException\RuntimeException('Error writing request to server');
             }
         }
-        
+
         return $request;
     }
 
@@ -186,6 +180,7 @@ class Proxy extends Socket
      * @param integer $port
      * @param string  $http_ver
      * @param array   $headers
+     * @throws AdapterException\RuntimeException
      */
     protected function connectHandshake($host, $port = 443, $http_ver = '1.1', array &$headers = array())
     {
@@ -207,23 +202,28 @@ class Proxy extends Socket
         $request .= "\r\n";
 
         // Send the request
-        if (! @fwrite($this->socket, $request)) {
-            throw new AdapterException\RuntimeException("Error writing request to proxy server");
+        ErrorHandler::start();
+        $test  = fwrite($this->socket, $request);
+        $error = ErrorHandler::stop();
+        if (!$test) {
+            throw new AdapterException\RuntimeException("Error writing request to proxy server", 0, $error);
         }
 
         // Read response headers only
         $response = '';
         $gotStatus = false;
-        while ($line = @fgets($this->socket)) {
+        ErrorHandler::start();
+        while ($line = fgets($this->socket)) {
             $gotStatus = $gotStatus || (strpos($line, 'HTTP') !== false);
             if ($gotStatus) {
                 $response .= $line;
                 if (!rtrim($line)) break;
             }
         }
+        ErrorHandler::stop();
 
         // Check that the response from the proxy is 200
-        if (\Zend\Http\Response::extractCode($response) != 200) {
+        if (Response::extractCode($response) != 200) {
             throw new AdapterException\RuntimeException("Unable to connect to HTTPS proxy. Server response: " . $response);
         }
 
@@ -237,7 +237,7 @@ class Proxy extends Socket
         );
 
         $success = false;
-        foreach($modes as $mode) {
+        foreach ($modes as $mode) {
             $success = stream_socket_enable_crypto($this->socket, true, $mode);
             if ($success) break;
         }

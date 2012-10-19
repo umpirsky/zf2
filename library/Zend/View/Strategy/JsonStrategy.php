@@ -1,42 +1,28 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_View
- * @subpackage Strategy
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_View
  */
 
 namespace Zend\View\Strategy;
 
-use Zend\EventManager\EventCollection,
-    Zend\EventManager\ListenerAggregate,
-    Zend\Http\Request as HttpRequest,
-    Zend\Http\Response as HttpResponse,
-    Zend\View\Model,
-    Zend\View\Renderer\JsonRenderer,
-    Zend\View\ViewEvent;
+use Zend\EventManager\EventManagerInterface;
+use Zend\EventManager\ListenerAggregateInterface;
+use Zend\Http\Request as HttpRequest;
+use Zend\View\Model;
+use Zend\View\Renderer\JsonRenderer;
+use Zend\View\ViewEvent;
 
 /**
  * @category   Zend
  * @package    Zend_View
  * @subpackage Strategy
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
-class JsonStrategy implements ListenerAggregate
+class JsonStrategy implements ListenerAggregateInterface
 {
     /**
      * @var \Zend\Stdlib\CallbackHandler[]
@@ -50,9 +36,8 @@ class JsonStrategy implements ListenerAggregate
 
     /**
      * Constructor
-     * 
-     * @param  JsonRenderer $renderer 
-     * @return void
+     *
+     * @param  JsonRenderer $renderer
      */
     public function __construct(JsonRenderer $renderer)
     {
@@ -61,24 +46,24 @@ class JsonStrategy implements ListenerAggregate
 
     /**
      * Attach the aggregate to the specified event manager
-     * 
-     * @param  EventCollection $events 
+     *
+     * @param  EventManagerInterface $events
      * @param  int $priority
      * @return void
      */
-    public function attach(EventCollection $events, $priority = 1)
+    public function attach(EventManagerInterface $events, $priority = 1)
     {
-        $this->listeners[] = $events->attach('renderer', array($this, 'selectRenderer'), $priority);
-        $this->listeners[] = $events->attach('response', array($this, 'injectResponse'), $priority);
+        $this->listeners[] = $events->attach(ViewEvent::EVENT_RENDERER, array($this, 'selectRenderer'), $priority);
+        $this->listeners[] = $events->attach(ViewEvent::EVENT_RESPONSE, array($this, 'injectResponse'), $priority);
     }
 
     /**
      * Detach aggregate listeners from the specified event manager
-     * 
-     * @param  EventCollection $events 
+     *
+     * @param  EventManagerInterface $events
      * @return void
      */
-    public function detach(EventCollection $events)
+    public function detach(EventManagerInterface $events)
     {
         foreach ($this->listeners as $index => $listener) {
             if ($events->detach($listener)) {
@@ -90,44 +75,50 @@ class JsonStrategy implements ListenerAggregate
     /**
      * Detect if we should use the JsonRenderer based on model type and/or
      * Accept header
-     * 
-     * @param  ViewEvent $e 
+     *
+     * @param  ViewEvent $e
      * @return null|JsonRenderer
      */
     public function selectRenderer(ViewEvent $e)
     {
         $model = $e->getModel();
 
-        if ($model instanceof Model\JsonModel) {
-            // JsonModel found
-            return $this->renderer;
-        }
-
         $request = $e->getRequest();
         if (!$request instanceof HttpRequest) {
             // Not an HTTP request; cannot autodetermine
-            return;
+            return ($model instanceof Model\JsonModel) ? $this->renderer : null;
         }
 
-        $headers = $request->headers();
-        if ($headers->has('accept')) {
-            $accept  = $headers->get('Accept');
-            foreach ($accept->getPrioritized() as $mediaType) {
-                if (0 === strpos($mediaType, 'application/json')) {
-                    // application/json Accept header found
-                    return $this->renderer;
-                }
+        $headers = $request->getHeaders();
+        if (!$headers->has('accept')) {
+            return ($model instanceof Model\JsonModel) ? $this->renderer : null;
+        }
+
+        $accept  = $headers->get('Accept');
+        if (($match = $accept->match('application/json, application/javascript')) == false) {
+            return ($model instanceof Model\JsonModel) ? $this->renderer : null;
+        }
+
+        if ($match->getTypeString() == 'application/json') {
+            // application/json Accept header found
+            return $this->renderer;
+        }
+
+        if ($match->getTypeString() == 'application/javascript') {
+            // application/javascript Accept header found
+            if (false != ($callback = $request->getQuery()->get('callback'))) {
+                $this->renderer->setJsonpCallback($callback);
             }
+            return $this->renderer;
         }
 
-        // Not matched!
-        return;
+        return ($model instanceof Model\JsonModel) ? $this->renderer : null;
     }
 
     /**
      * Inject the response with the JSON payload and appropriate Content-Type header
-     * 
-     * @param  ViewEvent $e 
+     *
+     * @param  ViewEvent $e
      * @return void
      */
     public function injectResponse(ViewEvent $e)
@@ -147,7 +138,11 @@ class JsonStrategy implements ListenerAggregate
         // Populate response
         $response = $e->getResponse();
         $response->setContent($result);
-        $headers = $response->headers();
-        $headers->addHeaderLine('content-type', 'application/json');
+        $headers = $response->getHeaders();
+        if ($this->renderer->hasJsonpCallback()) {
+            $headers->addHeaderLine('content-type', 'application/javascript');
+        } else {
+            $headers->addHeaderLine('content-type', 'application/json');
+        }
     }
 }

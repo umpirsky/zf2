@@ -1,36 +1,22 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Feed_Pubsubhubbub
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Feed
  */
 
-/**
- * @namespace
- */
 namespace Zend\Feed\PubSubHubbub;
 
-use Zend\Feed\Reader,
-    Zend\Http;
+use Zend\Escaper\Escaper;
+use Zend\Feed\Reader;
+use Zend\Http;
 
 /**
  * @category   Zend
  * @package    Zend_Feed_Pubsubhubbub
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 class PubSubHubbub
 {
@@ -39,7 +25,7 @@ class PubSubHubbub
      */
     const VERIFICATION_MODE_SYNC  = 'sync';
     const VERIFICATION_MODE_ASYNC = 'async';
-    
+
     /**
      * Subscription States
      */
@@ -48,9 +34,14 @@ class PubSubHubbub
     const SUBSCRIPTION_TODELETE    = 'to_delete';
 
     /**
+     * @var Escaper
+     */
+    protected static $escaper;
+
+    /**
      * Singleton instance if required of the HTTP client
      *
-     * @var \Zend\Http\Client
+     * @var Http\Client
      */
     protected static $httpClient = null;
 
@@ -60,19 +51,20 @@ class PubSubHubbub
      * best if directly given an instance of Zend_Feed_Reader_Atom|Rss
      * to leverage off.
      *
-     * @param  \Zend\Feed\Reader\AbstractFeed|string $source
+     * @param  \Zend\Feed\Reader\Feed\AbstractFeed|string $source
      * @return array
+     * @throws Exception\InvalidArgumentException
      */
     public static function detectHubs($source)
     {
         if (is_string($source)) {
             $feed = Reader\Reader::import($source);
-        } elseif (is_object($source) && $source instanceof Reader\Feed\AbstractFeed) {
+        } elseif ($source instanceof Reader\Feed\AbstractFeed) {
             $feed = $source;
         } else {
-            throw new Exception('The source parameter was'
+            throw new Exception\InvalidArgumentException('The source parameter was'
             . ' invalid, i.e. not a URL string or an instance of type'
-            . ' Zend\Feed\Reader\FeedAbstract or Zend\Feed\Abstract');
+            . ' Zend\Feed\Reader\Feed\AbstractFeed');
         }
         return $feed->getHubs();
     }
@@ -81,7 +73,7 @@ class PubSubHubbub
      * Allows the external environment to make Zend_Oauth use a specific
      * Client instance.
      *
-     * @param  \Zend\Http\Client $httpClient
+     * @param  Http\Client $httpClient
      * @return void
      */
     public static function setHttpClient(Http\Client $httpClient)
@@ -94,15 +86,15 @@ class PubSubHubbub
      * the instance is reset and cleared of previous parameters GET/POST.
      * Headers are NOT reset but handled by this component if applicable.
      *
-     * @return \Zend\Http\Client
+     * @return Http\Client
      */
     public static function getHttpClient()
     {
-        if (!isset(self::$httpClient)):
+        if (!isset(self::$httpClient)) {
             self::$httpClient = new Http\Client;
-        else:
+        } else {
             self::$httpClient->resetParameters();
-        endif;
+        }
         return self::$httpClient;
     }
 
@@ -118,6 +110,33 @@ class PubSubHubbub
     }
 
     /**
+     * Set the Escaper instance
+     *
+     * If null, resets the instance
+     *
+     * @param  null|Escaper $escaper
+     */
+    public static function setEscaper(Escaper $escaper = null)
+    {
+        static::$escaper = $escaper;
+    }
+
+    /**
+     * Get the Escaper instance
+     *
+     * If none registered, lazy-loads an instance.
+     *
+     * @return Escaper
+     */
+    public static function getEscaper()
+    {
+        if (null === static::$escaper) {
+            static::setEscaper(new Escaper());
+        }
+        return static::$escaper;
+    }
+
+    /**
      * RFC 3986 safe url encoding method
      *
      * @param  string $string
@@ -125,7 +144,8 @@ class PubSubHubbub
      */
     public static function urlencode($string)
     {
-        $rawencoded = rawurlencode($string);
+        $escaper    = static::getEscaper();
+        $rawencoded = $escaper->escapeUrl($string);
         $rfcencoded = str_replace('%7E', '~', $rawencoded);
         return $rfcencoded;
     }

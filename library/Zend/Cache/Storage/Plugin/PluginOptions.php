@@ -1,39 +1,26 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Cache
- * @subpackage Storage
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Cache
  */
 
 namespace Zend\Cache\Storage\Plugin;
 
-use Zend\Cache\Exception,
-    Zend\Serializer\Adapter as SerializerAdapter,
-    Zend\Serializer\Serializer as SerializerFactory,
-    Zend\Stdlib\Options;
+use Zend\Cache\Exception;
+use Zend\Serializer\Adapter\AdapterInterface as SerializerAdapter;
+use Zend\Serializer\Serializer as SerializerFactory;
+use Zend\Stdlib\AbstractOptions;
 
 /**
  * @category   Zend
  * @package    Zend_Cache
  * @subpackage Storage
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
-class PluginOptions extends Options
+class PluginOptions extends AbstractOptions
 {
     /**
      * Used by:
@@ -41,13 +28,6 @@ class PluginOptions extends Options
      * @var int
      */
     protected $clearingFactor = 0;
-
-    /**
-     * Used by:
-     * - ClearByFactor
-     * @var int
-     */
-    protected $clearByNamespace = true;
 
     /**
      * Used by:
@@ -95,7 +75,7 @@ class PluginOptions extends Options
      * Set automatic clearing factor
      *
      * Used by:
-     * - ClearByFactor
+     * - ClearExpiredByFactor
      *
      * @param  int $clearingFactor
      * @return PluginOptions
@@ -110,7 +90,7 @@ class PluginOptions extends Options
      * Get automatic clearing factor
      *
      * Used by:
-     * - ClearByFactor
+     * - ClearExpiredByFactor
      *
      * @return int
      */
@@ -120,40 +100,13 @@ class PluginOptions extends Options
     }
 
     /**
-     * Set flag indicating whether or not to clear by namespace
-     *
-     * Used by:
-     * - ClearByFactor
-     *
-     * @param  bool $clearByNamespace
-     * @return PluginOptions
-     */
-    public function setClearByNamespace($clearByNamespace)
-    {
-        $this->clearByNamespace = $clearByNamespace;
-        return $this;
-    }
-
-    /**
-     * Clear items by namespace?
-     *
-     * Used by:
-     * - ClearByFactor
-     *
-     * @return bool
-     */
-    public function getClearByNamespace()
-    {
-        return $this->clearByNamespace;
-    }
-
-    /**
      * Set callback to call on intercepted exception
      *
      * Used by:
      * - ExceptionHandler
      *
-     * @param  callable EexceptionCallback
+     * @param  callable $exceptionCallback
+     * @throws Exception\InvalidArgumentException
      * @return PluginOptions
      */
     public function setExceptionCallback($exceptionCallback)
@@ -235,13 +188,14 @@ class PluginOptions extends Options
      * - Serializer
      *
      * @param  string|SerializerAdapter $serializer
+     * @throws Exception\InvalidArgumentException
      * @return Serializer
      */
     public function setSerializer($serializer)
     {
         if (!is_string($serializer) && !$serializer instanceof SerializerAdapter) {
             throw new Exception\InvalidArgumentException(sprintf(
-                '%s expects either a string serializer name or Zend\Serializer\Adapter instance; '
+                '%s expects either a string serializer name or Zend\Serializer\Adapter\AdapterInterface instance; '
                 . 'received "%s"',
                 __METHOD__,
                 (is_object($serializer) ? get_class($serializer) : gettype($serializer))
@@ -261,13 +215,16 @@ class PluginOptions extends Options
      */
     public function getSerializer()
     {
-        if (is_string($this->serializer)) {
-            $options = $this->getSerializerOptions();
-            $this->setSerializer(SerializerFactory::factory($this->serializer, $options));
-        } elseif (null === $this->serializer) {
-            $this->setSerializer(SerializerFactory::getDefaultAdapter());
+        if (!$this->serializer instanceof SerializerAdapter) {
+            // use default serializer
+            if (!$this->serializer) {
+                $this->setSerializer(SerializerFactory::getDefaultAdapter());
+            // instantiate by class name + serializer_options
+            } else {
+                $options = $this->getSerializerOptions();
+                $this->setSerializer(SerializerFactory::factory($this->serializer, $options));
+            }
         }
-
         return $this->serializer;
     }
 
@@ -277,10 +234,10 @@ class PluginOptions extends Options
      * Used by:
      * - Serializer
      *
-     * @param  array $serializerOptions
+     * @param  mixed $serializerOptions
      * @return PluginOptions
      */
-    public function setSerializerOptions(array $serializerOptions)
+    public function setSerializerOptions($serializerOptions)
     {
         $this->serializerOptions = $serializerOptions;
         return $this;
@@ -340,7 +297,7 @@ class PluginOptions extends Options
     {
         $factor = (int) $factor;
         if ($factor < 0) {
-            throw new Exception\InvalidArgumentAxception(
+            throw new Exception\InvalidArgumentException(
                 "Invalid factor '{$factor}': must be greater or equal 0"
             );
         }

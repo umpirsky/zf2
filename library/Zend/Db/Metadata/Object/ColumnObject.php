@@ -1,22 +1,11 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Db
- * @subpackage Metadata
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Db
  */
 
 namespace Zend\Db\Metadata\Object;
@@ -25,109 +14,94 @@ namespace Zend\Db\Metadata\Object;
  * @category   Zend
  * @package    Zend_Db
  * @subpackage Metadata
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 class ColumnObject
 {
-    /*
-    protected $catalogName = null;
-    protected $schemaName = null;
-    */
+
     /**
      *
      * @var string
      */
     protected $name = null;
+
     /**
      *
      * @var string
      */
     protected $tableName = null;
+
     /**
      *
      * @var string
      */
     protected $schemaName = null;
+
     /**
      *
-     * @var 
+     * @var
      */
     protected $ordinalPosition = null;
+
     /**
      *
      * @var string
      */
     protected $columnDefault = null;
+
     /**
      *
-     * @var boolean 
+     * @var boolean
      */
     protected $isNullable = null;
+
     /**
      *
      * @var string
      */
     protected $dataType = null;
+
     /**
      *
      * @var integer
      */
     protected $characterMaximumLength = null;
+
     /**
      *
      * @var integer
      */
     protected $characterOctetLength = null;
+
     /**
      *
-     * @var type
+     * @var int
      */
     protected $numericPrecision = null;
+
     /**
      *
-     * @var type 
+     * @var int
      */
     protected $numericScale = null;
-//    protected $characterSetName = null;
-//    protected $collationName = null;
+
+    /**
+     *
+     * @var boolean
+     */
+    protected $numericUnsigned = null;
+
     /**
      *
      * @var array
      */
     protected $errata = array();
 
-
-    /*
-    public function getCatalogName()
-    {
-        return $this->catalogName;
-    }
-    
-    public function setCatalogName($catalogName)
-    {
-        $this->catalogName = $catalogName;
-        return $this;
-    }
-    
-    public function getSchemaName()
-    {
-        return $this->schemaName;
-    }
-    
-    public function setSchemaName($schemaName)
-    {
-        $this->schemaName = $schemaName;
-        return $this;
-    }
-    */
-
     /**
      * Constructor
-     * 
+     *
      * @param string $name
      * @param string $tableName
-     * @param string $schemaName 
+     * @param string $schemaName
      */
     public function __construct($name, $tableName, $schemaName = null)
     {
@@ -135,19 +109,21 @@ class ColumnObject
         $this->setTableName($tableName);
         $this->setSchemaName($schemaName);
     }
+
     /**
      * Set name
-     * 
-     * @param string $name 
+     *
+     * @param string $name
      */
     public function setName($name)
     {
         $this->name = $name;
     }
+
     /**
      * Get name
-     * 
-     * @return string 
+     *
+     * @return string
      */
     public function getName()
     {
@@ -156,7 +132,7 @@ class ColumnObject
 
     /**
      * Get table name
-     * 
+     *
      * @return string
      */
     public function getTableName()
@@ -166,27 +142,30 @@ class ColumnObject
 
     /**
      * Set table name
-     * 
+     *
      * @param string $tableName
+     * @return ColumnObject
      */
     public function setTableName($tableName)
     {
         $this->tableName = $tableName;
         return $this;
     }
+
     /**
      * Set schema name
-     * 
-     * @param string $schemaName 
+     *
+     * @param string $schemaName
      */
     public function setSchemaName($schemaName)
     {
         $this->schemaName = $schemaName;
     }
+
     /**
      * Get schema name
-     * 
-     * @return string 
+     *
+     * @return string
      */
     public function getSchemaName()
     {
@@ -203,7 +182,7 @@ class ColumnObject
 
     /**
      * @param int $ordinalPosition to set
-     * @return Column
+     * @return ColumnObject
      */
     public function setOrdinalPosition($ordinalPosition)
     {
@@ -212,7 +191,7 @@ class ColumnObject
     }
 
     /**
-     * @return the $columnDefault
+     * @return null|string the $columnDefault
      */
     public function getColumnDefault()
     {
@@ -221,6 +200,7 @@ class ColumnObject
 
     /**
      * @param mixed $columnDefault to set
+     * @return ColumnObject
      */
     public function setColumnDefault($columnDefault)
     {
@@ -238,6 +218,7 @@ class ColumnObject
 
     /**
      * @param bool $isNullable to set
+     * @return ColumnObject
      */
     public function setIsNullable($isNullable)
     {
@@ -246,7 +227,15 @@ class ColumnObject
     }
 
     /**
-     * @return the $dataType
+     * @return bool $isNullable
+     */
+    public function isNullable()
+    {
+        return $this->isNullable;
+    }
+
+    /**
+     * @return null|string the $dataType
      */
     public function getDataType()
     {
@@ -254,7 +243,8 @@ class ColumnObject
     }
 
     /**
-     * @param $dataType the $dataType to set
+     * @param string $dataType the $dataType to set
+     * @return ColumnObject
      */
     public function setDataType($dataType)
     {
@@ -263,7 +253,7 @@ class ColumnObject
     }
 
     /**
-     * @return the $characterMaximumLength
+     * @return int|null the $characterMaximumLength
      */
     public function getCharacterMaximumLength()
     {
@@ -271,7 +261,8 @@ class ColumnObject
     }
 
     /**
-     * @param $characterMaximumLength the $characterMaximumLength to set
+     * @param int $characterMaximumLength the $characterMaximumLength to set
+     * @return ColumnObject
      */
     public function setCharacterMaximumLength($characterMaximumLength)
     {
@@ -280,7 +271,7 @@ class ColumnObject
     }
 
     /**
-     * @return the $characterOctetLength
+     * @return int|null the $characterOctetLength
      */
     public function getCharacterOctetLength()
     {
@@ -288,7 +279,8 @@ class ColumnObject
     }
 
     /**
-     * @param $characterOctetLength the $characterOctetLength to set
+     * @param int $characterOctetLength the $characterOctetLength to set
+     * @return ColumnObject
      */
     public function setCharacterOctetLength($characterOctetLength)
     {
@@ -297,7 +289,7 @@ class ColumnObject
     }
 
     /**
-     * @return the $numericPrecision
+     * @return int the $numericPrecision
      */
     public function getNumericPrecision()
     {
@@ -305,7 +297,8 @@ class ColumnObject
     }
 
     /**
-     * @param $numericPrevision the $numericPrevision to set
+     * @param int $numericPrecision the $numericPrevision to set
+     * @return ColumnObject
      */
     public function setNumericPrecision($numericPrecision)
     {
@@ -314,7 +307,7 @@ class ColumnObject
     }
 
     /**
-     * @return the $numericScale
+     * @return int the $numericScale
      */
     public function getNumericScale()
     {
@@ -322,7 +315,8 @@ class ColumnObject
     }
 
     /**
-     * @param $numericScale the $numericScale to set
+     * @param int $numericScale the $numericScale to set
+     * @return ColumnObject
      */
     public function setNumericScale($numericScale)
     {
@@ -330,43 +324,34 @@ class ColumnObject
         return $this;
     }
 
-//    /**
-//     * @return the $characterSetName
-//     */
-//    public function getCharacterSetName()
-//    {
-//        return $this->characterSetName;
-//    }
-//
-//    /**
-//     * @param $characterSetName the $characterSetName to set
-//     */
-//    public function setCharacterSetName($characterSetName)
-//    {
-//        $this->characterSetName = $characterSetName;
-//        return $this;
-//    }
-//
-//    /**
-//     * @return the $collationName
-//     */
-//    public function getCollationName()
-//    {
-//        return $this->collationName;
-//    }
-//
-//    /**
-//     * @param $collationName the $collationName to set
-//     */
-//    public function setCollationName($collationName)
-//    {
-//        $this->collationName = $collationName;
-//        return $this;
-//    }
-
+    /**
+     * @return boolean
+     */
+    public function getNumericUnsigned()
+    {
+        return $this->numericUnsigned;
+    }
 
     /**
-     * @return the $errata
+     * @param boolean $numericUnsigned
+     * @return ColumnObject
+     */
+    public function setNumericUnsigned($numericUnsigned)
+    {
+        $this->numericUnsigned = $numericUnsigned;
+        return $this;
+    }
+
+    /**
+     * @return boolean
+     */
+    public function isNumericUnsigned()
+    {
+        return $this->numericUnsigned;
+    }
+
+    /**
+     * @return array the $errata
      */
     public function getErratas()
     {
@@ -374,17 +359,38 @@ class ColumnObject
     }
 
     /**
+     * @param array $erratas
+     * @return ColumnObject
+     */
+    public function setErratas(array $erratas)
+    {
+        foreach ($erratas as $name => $value) {
+            $this->setErrata($name, $value);
+        }
+        return $this;
+    }
+
+    /**
+     * @param string $errataName
+     * @return mixed
+     */
+    public function getErrata($errataName)
+    {
+        if (array_key_exists($errataName, $this->errata)) {
+            return $this->errata[$errataName];
+        }
+        return null;
+    }
+
+    /**
      * @param string $errataName
      * @param mixed $errataValue
-     * @return ColumnMetadata
+     * @return ColumnObject
      */
     public function setErrata($errataName, $errataValue)
     {
         $this->errata[$errataName] = $errataValue;
         return $this;
     }
-
-
-
 
 }

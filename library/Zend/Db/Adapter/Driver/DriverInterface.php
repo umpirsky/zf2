@@ -1,22 +1,11 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Db
- * @subpackage Adapter
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Db
  */
 
 namespace Zend\Db\Adapter\Driver;
@@ -25,8 +14,6 @@ namespace Zend\Db\Adapter\Driver;
  * @category   Zend
  * @package    Zend_Db
  * @subpackage Adapter
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 interface DriverInterface
 {
@@ -36,40 +23,63 @@ interface DriverInterface
     const NAME_FORMAT_NATURAL = 'natural';
 
     /**
+     * Get database platform name
+     *
      * @param string $nameFormat
      * @return string
      */
     public function getDatabasePlatformName($nameFormat = self::NAME_FORMAT_CAMELCASE);
 
     /**
+     * Check environment
+     *
      * @return bool
      */
     public function checkEnvironment();
 
     /**
+     * Get connection
+     *
      * @return ConnectionInterface
      */
     public function getConnection();
 
     /**
+     * Create statement
+     *
+     * @param string|resource $sqlOrResource
      * @return StatementInterface
      */
     public function createStatement($sqlOrResource = null);
 
     /**
+     * Create result
+     *
+     * @param resource $resource
      * @return ResultInterface
      */
     public function createResult($resource);
 
     /**
+     * Get prepare type
+     *
      * @return array
      */
     public function getPrepareType();
 
     /**
-     * @param $name
+     * Format parameter name
+     *
+     * @param string $name
+     * @param mixed  $type
      * @return string
      */
     public function formatParameterName($name, $type = null);
 
+    /**
+     * Get last generated value
+     *
+     * @return mixed
+     */
+    public function getLastGeneratedValue();
 }

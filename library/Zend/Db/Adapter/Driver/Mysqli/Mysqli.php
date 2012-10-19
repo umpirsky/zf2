@@ -1,35 +1,23 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Db
- * @subpackage Adapter
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Db
  */
-
 
 namespace Zend\Db\Adapter\Driver\Mysqli;
 
+use mysqli_stmt;
 use Zend\Db\Adapter\Driver\DriverInterface;
+use Zend\Db\Adapter\Exception;
 
 /**
  * @category   Zend
  * @package    Zend_Db
  * @subpackage Adapter
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 class Mysqli implements DriverInterface
 {
@@ -50,30 +38,38 @@ class Mysqli implements DriverInterface
     protected $resultPrototype = null;
 
     /**
+     * @var array
+     */
+    protected $options = array(
+        'buffer_results' => false
+    );
+
+    /**
+     * Constructor
+     *
      * @param array|Connection|\mysqli $connection
      * @param null|Statement $statementPrototype
      * @param null|Result $resultPrototype
+     * @param array $options
      */
-    public function __construct($connection, Statement $statementPrototype = null, Result $resultPrototype = null)
+    public function __construct($connection, Statement $statementPrototype = null, Result $resultPrototype = null, array $options = array())
     {
         if (!$connection instanceof Connection) {
             $connection = new Connection($connection);
         }
 
-        if (!$connection instanceof Connection) {
-            throw new \InvalidArgumentException('$connection must be an array of parameters or a Pdo\Connection object');
-        }
+        $options = array_intersect_key(array_merge($this->options, $options), $this->options);
 
         $this->registerConnection($connection);
-        $this->registerStatementPrototype(($statementPrototype) ?: new Statement());
+        $this->registerStatementPrototype(($statementPrototype) ?: new Statement($options['buffer_results']));
         $this->registerResultPrototype(($resultPrototype) ?: new Result());
     }
 
     /**
      * Register connection
-     * 
+     *
      * @param  Connection $connection
-     * @return Mysqli 
+     * @return Mysqli
      */
     public function registerConnection(Connection $connection)
     {
@@ -84,8 +80,8 @@ class Mysqli implements DriverInterface
 
     /**
      * Register statement prototype
-     * 
-     * @param Statement $statementPrototype 
+     *
+     * @param Statement $statementPrototype
      */
     public function registerStatementPrototype(Statement $statementPrototype)
     {
@@ -94,9 +90,19 @@ class Mysqli implements DriverInterface
     }
 
     /**
+     * Get statement prototype
+     *
+     * @return null|Statement
+     */
+    public function getStatementPrototype()
+    {
+        return $this->statementPrototype;
+    }
+
+    /**
      * Register result prototype
-     * 
-     * @param Result $resultPrototype 
+     *
+     * @param Result $resultPrototype
      */
     public function registerResultPrototype(Result $resultPrototype)
     {
@@ -104,10 +110,18 @@ class Mysqli implements DriverInterface
     }
 
     /**
+     * @return null|Result
+     */
+    public function getResultPrototype()
+    {
+        return $this->resultPrototype;
+    }
+
+    /**
      * Get database platform name
-     * 
+     *
      * @param  string $nameFormat
-     * @return string 
+     * @return string
      */
     public function getDatabasePlatformName($nameFormat = self::NAME_FORMAT_CAMELCASE)
     {
@@ -117,18 +131,23 @@ class Mysqli implements DriverInterface
             return 'MySQL';
         }
     }
-    
+
     /**
      * Check environment
+     *
+     * @throws Exception\RuntimeException
+     * @return void
      */
     public function checkEnvironment()
     {
         if (!extension_loaded('mysqli')) {
-            throw new \Exception('The Mysqli extension is required for this adapter but the extension is not loaded');
+            throw new Exception\RuntimeException('The Mysqli extension is required for this adapter but the extension is not loaded');
         }
     }
 
     /**
+     * Get connection
+     *
      * @return Connection
      */
     public function getConnection()
@@ -137,32 +156,52 @@ class Mysqli implements DriverInterface
     }
 
     /**
-     * @param string $sql
+     * Create statement
+     *
+     * @param string $sqlOrResource
      * @return Statement
      */
     public function createStatement($sqlOrResource = null)
     {
-        $statement = clone $this->statementPrototype;
-        if (is_string($sqlOrResource)) {
-            $statement->setSql($sqlOrResource);
-        } elseif ($sqlOrResource instanceof \mysqli_stmt) {
-            $statement->setResource($sqlOrResource);
+        /**
+         * @todo Resource tracking
+        if (is_resource($sqlOrResource) && !in_array($sqlOrResource, $this->resources, true)) {
+            $this->resources[] = $sqlOrResource;
         }
-        $statement->initialize($this->connection->getResource());
+        */
+
+        $statement = clone $this->statementPrototype;
+        if ($sqlOrResource instanceof mysqli_stmt) {
+            $statement->setResource($sqlOrResource);
+        } else {
+            if (is_string($sqlOrResource)) {
+                $statement->setSql($sqlOrResource);
+            }
+            if (!$this->connection->isConnected()) {
+                $this->connection->connect();
+            }
+            $statement->initialize($this->connection->getResource());
+        }
         return $statement;
     }
 
     /**
+     * Create result
+     *
+     * @param resource $resource
+     * @param null|bool $isBuffered
      * @return Result
      */
-    public function createResult($resource)
+    public function createResult($resource, $isBuffered = null)
     {
         $result = clone $this->resultPrototype;
-        $result->initialize($resource);
+        $result->initialize($resource, $this->connection->getLastGeneratedValue(), $isBuffered);
         return $result;
     }
 
     /**
+     * Get prepare type
+     *
      * @return array
      */
     public function getPrepareType()
@@ -171,11 +210,25 @@ class Mysqli implements DriverInterface
     }
 
     /**
-     * @param $name
+     * Format parameter name
+     *
+     * @param string $name
+     * @param mixed  $type
      * @return string
      */
     public function formatParameterName($name, $type = null)
     {
         return '?';
     }
+
+    /**
+     * Get last generated value
+     *
+     * @return mixed
+     */
+    public function getLastGeneratedValue()
+    {
+        return $this->getConnection()->getLastGeneratedValue();
+    }
+
 }

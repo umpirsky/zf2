@@ -1,39 +1,26 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend\Http\Client
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Http
  */
 
-/**
- * @namespace
- */
 namespace Zend\Http\Client;
 
-use Zend\Stdlib\ParametersDescription,
-    Zend\Uri,
-    Zend\Http\Header\Cookie,
-    Zend\Http\Response;
+use ArrayIterator;
+use Zend\Http\Header\Cookie;
+use Zend\Http\Response;
+use Zend\Uri;
 
 /**
  * A Cookies object is designed to contain and maintain HTTP cookies, and should
  * be used along with Zend_Http_Client in order to manage cookies across HTTP requests and
  * responses.
  *
- * The class contains an array of Zend\Http\Header\Cookie objects. Cookies can be added 
+ * The class contains an array of Zend\Http\Header\Cookie objects. Cookies can be added
  * automatically from a request or manually. Then, the Cookies class can find and return the
  * cookies needed for a specific HTTP request.
  *
@@ -48,10 +35,8 @@ use Zend\Stdlib\ParametersDescription,
  *
  * @category   Zend
  * @package    Zend\Http\Client
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
-class Cookies //implements ParametersDescription
+class Cookies
 {
     /**
      * Return cookie(s) as a Zend\Http\Header\Cookie object
@@ -95,10 +80,10 @@ class Cookies //implements ParametersDescription
      *
      * @var array
      */
-    protected $_rawCookies = array();
+    protected $rawCookies = array();
 
     /**
-     * Construct 
+     * Construct
      *
      */
     public function __construct()
@@ -110,6 +95,7 @@ class Cookies //implements ParametersDescription
      *
      * @param Cookie|string $cookie
      * @param Uri\Uri|string    $ref_uri Optional reference URI (for domain, path, secure)
+     * @throws Exception\InvalidArgumentException if invalid $cookie value
      */
     public function addCookie($cookie, $ref_uri = null)
     {
@@ -127,7 +113,7 @@ class Cookies //implements ParametersDescription
                 $this->cookies[$domain][$path] = array();
             }
             $this->cookies[$domain][$path][$cookie->getName()] = $cookie;
-            $this->_rawCookies[] = $cookie;
+            $this->rawCookies[] = $cookie;
         } else {
             throw new Exception\InvalidArgumentException('Supplient argument is not a valid cookie string or object');
         }
@@ -139,13 +125,9 @@ class Cookies //implements ParametersDescription
      * @param Response $response
      * @param Uri\Uri|string $ref_uri Requested URI
      */
-    public function addCookiesFromResponse($response, $ref_uri)
+    public function addCookiesFromResponse(Response $response, $ref_uri)
     {
-        if (!$response instanceof Response) {
-            throw new Exception\InvalidArgumentException('$response is expected to be a Response object');
-        }
-
-        $cookie_hdrs = $response->headers()->get('Set-Cookie');
+        $cookie_hdrs = $response->getHeaders()->get('Set-Cookie');
 
         if (is_array($cookie_hdrs)) {
             foreach ($cookie_hdrs as $cookie) {
@@ -177,6 +159,7 @@ class Cookies //implements ParametersDescription
      * @param boolean $matchSessionCookies Whether to send session cookies
      * @param int $ret_as Whether to return cookies as objects of \Zend\Http\Header\Cookie or as strings
      * @param int $now Override the current time when checking for expiry time
+     * @throws Exception\InvalidArgumentException if invalid URI
      * @return array|string
      */
     public function getMatchingCookies($uri, $matchSessionCookies = true,
@@ -184,8 +167,7 @@ class Cookies //implements ParametersDescription
     {
         if (is_string($uri)) {
             $uri = Uri\UriFactory::factory($uri, 'http');
-        }
-        if (!$uri instanceof Uri\Uri) {
+        } elseif (!$uri instanceof Uri\Uri) {
             throw new Exception\InvalidArgumentException("Invalid URI string or object passed");
         }
 
@@ -199,7 +181,7 @@ class Cookies //implements ParametersDescription
         $cookies = $this->_matchPath($cookies, $uri->getPath());
         $cookies = $this->_flattenCookiesArray($cookies, self::COOKIE_OBJECT);
 
-        // Next, run Cookie->match on all cookies to check secure, time and session mathcing
+        // Next, run Cookie->match on all cookies to check secure, time and session matching
         $ret = array();
         foreach ($cookies as $cookie)
             if ($cookie->match($uri, $matchSessionCookies, $now))
@@ -217,15 +199,14 @@ class Cookies //implements ParametersDescription
      * @param Uri\Uri|string $uri The uri (domain and path) to match
      * @param string $cookie_name The cookie's name
      * @param int $ret_as Whether to return cookies as objects of \Zend\Http\Header\Cookie or as strings
+     * @throws Exception\InvalidArgumentException if invalid URI specified or invalid $ret_as value
      * @return Cookie|string
      */
     public function getCookie($uri, $cookie_name, $ret_as = self::COOKIE_OBJECT)
     {
         if (is_string($uri)) {
             $uri = Uri\UriFactory::factory($uri, 'http');
-        }
-
-        if (!$uri instanceof Uri\Uri) {
+        } elseif (!$uri instanceof Uri\Uri) {
             throw new Exception\InvalidArgumentException('Invalid URI specified');
         }
 
@@ -262,14 +243,15 @@ class Cookies //implements ParametersDescription
     }
 
     /**
-     * Helper function to recursivly flatten an array. Shoud be used when exporting the
+     * Helper function to recursively flatten an array. Should be used when exporting the
      * cookies array (or parts of it)
      *
      * @param \Zend\Http\Header\Cookie|array $ptr
      * @param int $ret_as What value to return
      * @return array|string
      */
-    protected function _flattenCookiesArray($ptr, $ret_as = self::COOKIE_OBJECT) {
+    protected function _flattenCookiesArray($ptr, $ret_as = self::COOKIE_OBJECT)
+    {
         if (is_array($ptr)) {
             $ret = ($ret_as == self::COOKIE_STRING_CONCAT ? '' : array());
             foreach ($ptr as $item) {
@@ -322,7 +304,7 @@ class Cookies //implements ParametersDescription
     /**
      * Return a subset of a domain-matching cookies that also match a specified path
      *
-     * @param array $dom_array
+     * @param array $domains
      * @param string $path
      * @return array
      */
@@ -370,7 +352,7 @@ class Cookies //implements ParametersDescription
      */
     public function count()
     {
-        return count($this->_rawCookies);
+        return count($this->rawCookies);
     }
 
     /**
@@ -380,11 +362,11 @@ class Cookies //implements ParametersDescription
      */
     public function getIterator()
     {
-        return new \ArrayIterator($this->_rawCookies);
+        return new ArrayIterator($this->rawCookies);
     }
 
     /**
-     * Tells if the array of cookies is empty 
+     * Tells if the array of cookies is empty
      *
      * @return bool
      */
@@ -400,7 +382,7 @@ class Cookies //implements ParametersDescription
      */
     public function reset()
     {
-        $this->cookies = $this->_rawCookies = array();
+        $this->cookies = $this->rawCookies = array();
         return $this;
     }
 

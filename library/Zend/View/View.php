@@ -1,40 +1,32 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_View
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_View
  */
 
 namespace Zend\View;
 
-use Zend\EventManager\EventCollection,
-    Zend\EventManager\EventManager,
-    Zend\Stdlib\RequestDescription as Request,
-    Zend\Stdlib\ResponseDescription as Response;
+use Zend\EventManager\EventManager;
+use Zend\EventManager\EventManagerAwareInterface;
+use Zend\EventManager\EventManagerInterface;
+use Zend\Stdlib\RequestInterface as Request;
+use Zend\Stdlib\ResponseInterface as Response;
+use Zend\View\Model\ModelInterface as Model;
+use Zend\View\Renderer\RendererInterface as Renderer;
+use Zend\View\Renderer\TreeRendererInterface;
 
 /**
  * @category   Zend
  * @package    Zend_View
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
-class View
+class View implements EventManagerAwareInterface
 {
     /**
-     * @var EventCollection
+     * @var EventManagerInterface
      */
     protected $events;
 
@@ -50,8 +42,8 @@ class View
 
     /**
      * Set MVC request object
-     * 
-     * @param  Request $request 
+     *
+     * @param  Request $request
      * @return View
      */
     public function setRequest(Request $request)
@@ -61,9 +53,9 @@ class View
     }
 
     /**
-     * Set MVC response object 
-     * 
-     * @param  Response $response 
+     * Set MVC response object
+     *
+     * @param  Response $response
      * @return View
      */
     public function setResponse(Response $response)
@@ -74,7 +66,7 @@ class View
 
     /**
      * Get MVC request object
-     * 
+     *
      * @return null|Request
      */
     public function getRequest()
@@ -84,7 +76,7 @@ class View
 
     /**
      * Get MVC response object
-     * 
+     *
      * @return null|Response
      */
     public function getResponse()
@@ -94,12 +86,16 @@ class View
 
     /**
      * Set the event manager instance
-     * 
-     * @param  EventCollection $events 
+     *
+     * @param  EventManagerInterface $events
      * @return View
      */
-    public function setEventManager(EventCollection $events)
+    public function setEventManager(EventManagerInterface $events)
     {
+        $events->setIdentifiers(array(
+            __CLASS__,
+            get_called_class(),
+        ));
         $this->events = $events;
         return $this;
     }
@@ -108,16 +104,13 @@ class View
      * Retrieve the event manager instance
      *
      * Lazy-loads a default instance if none available
-     * 
-     * @return EventCollection
+     *
+     * @return EventManagerInterface
      */
-    public function events()
+    public function getEventManager()
     {
-        if (!$this->events instanceof EventCollection) {
-            $this->setEventManager(new EventManager(array(
-                __CLASS__,
-                get_called_class(),
-            )));
+        if (!$this->events instanceof EventManagerInterface) {
+            $this->setEventManager(new EventManager());
         }
         return $this->events;
     }
@@ -128,16 +121,16 @@ class View
      * Expects a callable. Strategies should accept a ViewEvent object, and should
      * return a Renderer instance if the strategy is selected.
      *
-     * Internally, the callable provided will be subscribed to the "renderer" 
+     * Internally, the callable provided will be subscribed to the "renderer"
      * event, at the priority specified.
-     * 
-     * @param  callable $callable 
-     * @param  int $priority 
+     *
+     * @param  callable $callable
+     * @param  int $priority
      * @return View
      */
     public function addRenderingStrategy($callable, $priority = 1)
     {
-        $this->events()->attach('renderer', $callable, $priority);
+        $this->getEventManager()->attach(ViewEvent::EVENT_RENDERER, $callable, $priority);
         return $this;
     }
 
@@ -149,19 +142,19 @@ class View
      *
      * Typical usages for a response strategy are to populate the Response object.
      *
-     * Internally, the callable provided will be subscribed to the "response" 
+     * Internally, the callable provided will be subscribed to the "response"
      * event, at the priority specified.
-     * 
-     * @param  callable $callable 
-     * @param  int $priority 
+     *
+     * @param  callable $callable
+     * @param  int $priority
      * @return View
      */
     public function addResponseStrategy($callable, $priority = 1)
     {
-        $this->events()->attach('response', $callable, $priority);
+        $this->getEventManager()->attach(ViewEvent::EVENT_RESPONSE, $callable, $priority);
         return $this;
     }
-     
+
     /**
      * Render the provided model.
      *
@@ -174,14 +167,15 @@ class View
      * @triggers renderer(ViewEvent)
      * @triggers response(ViewEvent)
      * @param  Model $model
+     * @throws Exception\RuntimeException
      * @return void
      */
     public function render(Model $model)
     {
         $event   = $this->getEvent();
         $event->setModel($model);
-        $events  = $this->events();
-        $results = $events->trigger('renderer', $event, function($result) {
+        $events  = $this->getEventManager();
+        $results = $events->trigger(ViewEvent::EVENT_RENDERER, $event, function($result) {
             return ($result instanceof Renderer);
         });
         $renderer = $results->last();
@@ -196,7 +190,7 @@ class View
         // a) the renderer does not implement TreeRendererInterface, or
         // b) it does, but canRenderTrees() returns false
         if ($model->hasChildren()
-            && (!$renderer instanceof Renderer\TreeRendererInterface
+            && (!$renderer instanceof TreeRendererInterface
                 || !$renderer->canRenderTrees())
         ) {
             $this->renderChildren($model);
@@ -217,13 +211,14 @@ class View
 
         $event->setResult($rendered);
 
-        $events->trigger('response', $event);
+        $events->trigger(ViewEvent::EVENT_RESPONSE, $event);
     }
 
     /**
      * Loop through children, rendering each
-     * 
-     * @param  Model $model 
+     *
+     * @param  Model $model
+     * @throws Exception\DomainException
      * @return void
      */
     protected function renderChildren(Model $model)
@@ -237,14 +232,19 @@ class View
             $child->setOption('has_parent', null);
             $capture = $child->captureTo();
             if (!empty($capture)) {
-                $model->setVariable($capture, $result);
+                if ($child->isAppend()) {
+                    $oldResult=$model->{$capture};
+                    $model->setVariable($capture, $oldResult . $result);
+                } else {
+                    $model->setVariable($capture, $result);
+                }
             }
         }
     }
 
     /**
      * Create and return ViewEvent used by render()
-     * 
+     *
      * @return ViewEvent
      */
     protected function getEvent()

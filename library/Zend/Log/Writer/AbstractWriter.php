@@ -1,97 +1,178 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Log
- * @subpackage Writer
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Log
  */
 
-/**
- * @namespace
- */
 namespace Zend\Log\Writer;
 
-use Zend\Log\Factory,
-    Zend\Log\Writer,
-    Zend\Log\Filter,
-    Zend\Log\Formatter,
-    Zend\Log\Exception,
-    Zend\Config\Config;
+use Zend\Log\Exception;
+use Zend\Log\Filter;
+use Zend\Log\Formatter\FormatterInterface as Formatter;
+use Zend\Stdlib\ErrorHandler;
 
 /**
- * @uses       \Zend\Log\Exception\InvalidArgumentException
- * @uses       \Zend\Log\Factory
- * @uses       \Zend\Log\Filter\Priority
  * @category   Zend
  * @package    Zend_Log
  * @subpackage Writer
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
-abstract class AbstractWriter implements Writer, Factory
+abstract class AbstractWriter implements WriterInterface
 {
     /**
-     * @var array of Filter
+     * Filter plugins
+     *
+     * @var FilterPluginManager
      */
-    protected $_filters = array();
+    protected $filterPlugins;
 
     /**
-     * Formats the log message before writing.
+     * Filter chain
+     *
+     * @var Filter\FilterInterface[]
+     */
+    protected $filters = array();
+
+    /**
+     * Formats the log message before writing
      *
      * @var Formatter
      */
-    protected $_formatter;
+    protected $formatter;
+
+    /**
+     * Use Zend\Stdlib\ErrorHandler to report errors during calls to write
+     *
+     * @var bool
+     */
+    protected $convertWriteErrorsToExceptions = true;
+
+    /**
+     * Error level passed to Zend\Stdlib\ErrorHandler::start for errors reported during calls to write
+     *
+     * @var bool
+     */
+    protected $errorsToExceptionsConversionLevel = E_WARNING;
 
     /**
      * Add a filter specific to this writer.
      *
-     * @param  Filter|int  $filter
+     * @param  int|string|Filter\FilterInterface $filter
+     * @param  array|null $options
+     * @return AbstractWriter
      * @throws Exception\InvalidArgumentException
-     * @return self
      */
-    public function addFilter($filter)
+    public function addFilter($filter, array $options = null)
     {
         if (is_int($filter)) {
             $filter = new Filter\Priority($filter);
         }
 
-        if (!$filter instanceof Filter) {
-            throw new Exception\InvalidArgumentException('Invalid filter provided');
+        if (is_string($filter)) {
+            $filter = $this->filterPlugin($filter, $options);
         }
 
-        $this->_filters[] = $filter;
+        if (!$filter instanceof Filter\FilterInterface) {
+            throw new Exception\InvalidArgumentException(sprintf(
+                'Writer must implement Zend\Log\Filter\FilterInterface; received "%s"',
+                is_object($filter) ? get_class($filter) : gettype($filter)
+            ));
+        }
+
+        $this->filters[] = $filter;
         return $this;
+    }
+
+    /**
+     * Get filter plugin manager
+     *
+     * @return FilterPluginManager
+     */
+    public function getFilterPluginManager()
+    {
+        if (null === $this->filterPlugins) {
+            $this->setFilterPluginManager(new FilterPluginManager());
+        }
+        return $this->filterPlugins;
+    }
+
+    /**
+     * Set filter plugin manager
+     *
+     * @param  string|FilterPluginManager $plugins
+     * @return self
+     * @throws Exception\InvalidArgumentException
+     */
+    public function setFilterPluginManager($plugins)
+    {
+        if (is_string($plugins)) {
+            $plugins = new $plugins;
+        }
+        if (!$plugins instanceof FilterPluginManager) {
+            throw new Exception\InvalidArgumentException(sprintf(
+                'Writer plugin manager must extend %s\FilterPluginManager; received %s',
+                __NAMESPACE__,
+                is_object($plugins) ? get_class($plugins) : gettype($plugins)
+            ));
+        }
+
+        $this->filterPlugins = $plugins;
+        return $this;
+    }
+
+    /**
+     * Get filter instance
+     *
+     * @param string $name
+     * @param array|null $options
+     * @return Filter\FilterInterface
+     */
+    public function filterPlugin($name, array $options = null)
+    {
+        return $this->getFilterPluginManager()->get($name, $options);
     }
 
     /**
      * Log a message to this writer.
      *
-     * @param  array $event log data event
+     * @param array $event log data event
      * @return void
      */
-    public function write($event)
+    public function write(array $event)
     {
-        foreach ($this->_filters as $filter) {
-            if (! $filter->accept($event)) {
+        foreach ($this->filters as $filter) {
+            if (!$filter->filter($event)) {
                 return;
             }
         }
 
-        // exception occurs on error
-        $this->_write($event);
+        $errorHandlerStarted = false;
+
+        if ($this->convertWriteErrorsToExceptions && !ErrorHandler::started()) {
+            ErrorHandler::start($this->errorsToExceptionsConversionLevel);
+            $errorHandlerStarted = true;
+        }
+
+        try {
+            $this->doWrite($event);
+        } catch (\Exception $e) {
+            if ($errorHandlerStarted) {
+                ErrorHandler::stop();
+                $errorHandlerStarted = false;
+            }
+            throw $e;
+        }
+
+        if ($errorHandlerStarted) {
+            $error = ErrorHandler::stop();
+            $errorHandlerStarted = false;
+            if ($error) {
+                throw new Exception\RuntimeException("Unable to write", 0, $error);
+            }
+        }
     }
 
     /**
@@ -102,12 +183,22 @@ abstract class AbstractWriter implements Writer, Factory
      */
     public function setFormatter(Formatter $formatter)
     {
-        $this->_formatter = $formatter;
+        $this->formatter = $formatter;
         return $this;
     }
 
     /**
-     * Perform shutdown activites such as closing open resources
+     * Set convert write errors to exception flag
+     *
+     * @param bool $ignoreWriteErrors
+     */
+    public function setConvertWriteErrorsToExceptions($convertErrors)
+    {
+        $this->convertWriteErrorsToExceptions = $convertErrors;
+    }
+
+    /**
+     * Perform shutdown activities such as closing open resources
      *
      * @return void
      */
@@ -115,32 +206,10 @@ abstract class AbstractWriter implements Writer, Factory
     {}
 
     /**
-     * Write a message to the log.
+     * Write a message to the log
      *
-     * @param  array  $event  log data event
+     * @param array $event log data event
      * @return void
      */
-    abstract protected function _write($event);
-
-    /**
-     * Validate and optionally convert the config to array
-     *
-     * @param  array|Config $config Config or Array
-     * @return array
-     * @throws Exception\InvalidArgumentException
-     */
-    static protected function _parseConfig($config)
-    {
-        if ($config instanceof Config) {
-            $config = $config->toArray();
-        }
-
-        if (!is_array($config)) {
-            throw new Exception\InvalidArgumentException(
-                'Configuration must be an array or instance of Zend\Config\Config'
-            );
-        }
-
-        return $config;
-    }
+    abstract protected function doWrite(array $event);
 }

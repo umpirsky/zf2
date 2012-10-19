@@ -1,39 +1,23 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Mail
- * @subpackage Protocol
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Mail
  */
 
-/**
- * @namespace
- */
 namespace Zend\Mail\Protocol\Smtp\Auth;
+
 use Zend\Mail\Protocol\Smtp;
 
 /**
  * Performs PLAIN authentication
  *
- * @uses       \Zend\Mail\Protocol\Smtp
  * @category   Zend
  * @package    Zend_Mail
  * @subpackage Protocol
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 class Plain extends Smtp
 {
@@ -59,7 +43,6 @@ class Plain extends Smtp
      * @param  string $host   (Default: 127.0.0.1)
      * @param  int    $port   (Default: null)
      * @param  array  $config Auth-specific parameters
-     * @return void
      */
     public function __construct($host = '127.0.0.1', $port = null, $config = null)
     {
@@ -91,7 +74,6 @@ class Plain extends Smtp
     /**
      * Perform PLAIN authentication with supplied credentials
      *
-     * @return void
      */
     public function auth()
     {
@@ -102,13 +84,13 @@ class Plain extends Smtp
         $this->_expect(334);
         $this->_send(base64_encode("\0" . $this->getUsername() . "\0" . $this->getPassword()));
         $this->_expect(235);
-        $this->_auth = true;
+        $this->auth = true;
     }
 
     /**
      * Set value for username
      *
-     * @param  string $value
+     * @param  string $username
      * @return Plain
      */
     public function setUsername($username)
@@ -116,11 +98,11 @@ class Plain extends Smtp
         $this->username = $username;
         return $this;
     }
-    
+
     /**
      * Get username
      *
-     * @return null|string
+     * @return string
      */
     public function getUsername()
     {
@@ -130,7 +112,7 @@ class Plain extends Smtp
     /**
      * Set value for password
      *
-     * @param  string $value
+     * @param  string $password
      * @return Plain
      */
     public function setPassword($password)
@@ -138,11 +120,11 @@ class Plain extends Smtp
         $this->password = $password;
         return $this;
     }
-    
+
     /**
      * Get password
      *
-     * @return null|string
+     * @return string
      */
     public function getPassword()
     {

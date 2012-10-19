@@ -1,37 +1,24 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Mail
- * @subpackage Transport
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Mail
  */
 
 namespace Zend\Mail\Transport;
 
-use Zend\Mail\Exception,
-    Zend\Stdlib\Options;
+use Zend\Mail\Exception;
+use Zend\Stdlib\AbstractOptions;
 
 /**
  * @category   Zend
  * @package    Zend_Mail
  * @subpackage Transport
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
-class FileOptions extends Options
+class FileOptions extends AbstractOptions
 {
     /**
      * @var string Local client hostname
@@ -39,14 +26,15 @@ class FileOptions extends Options
     protected $path;
 
     /**
-     * @var Callable
+     * @var callable
      */
     protected $callback;
 
     /**
      * Set path to stored mail files
-     * 
-     * @param  string $path 
+     *
+     * @param  string $path
+     * @throws \Zend\Mail\Exception\InvalidArgumentException
      * @return FileOptions
      */
     public function setPath($path)
@@ -66,7 +54,7 @@ class FileOptions extends Options
      * Get path
      *
      * If none is set, uses value from sys_get_temp_dir()
-     * 
+     *
      * @return string
      */
     public function getPath()
@@ -79,8 +67,9 @@ class FileOptions extends Options
 
     /**
      * Set callback used to generate a file name
-     * 
-     * @param  Callable $callback 
+     *
+     * @param  callable $callback
+     * @throws \Zend\Mail\Exception\InvalidArgumentException
      * @return FileOptions
      */
     public function setCallback($callback)
@@ -98,8 +87,8 @@ class FileOptions extends Options
 
     /**
      * Get callback used to generate a file name
-     * 
-     * @return Callable
+     *
+     * @return callable
      */
     public function getCallback()
     {

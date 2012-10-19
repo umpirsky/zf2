@@ -1,30 +1,19 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_View
- * @subpackage Renderer
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_View
  */
 
 namespace Zend\View\Renderer;
 
-use Zend\View\Exception,
-    Zend\View\Model,
-    Zend\View\Renderer,
-    Zend\View\Resolver;
+use Zend\View\Exception;
+use Zend\View\Model\FeedModel;
+use Zend\View\Model\ModelInterface as Model;
+use Zend\View\Resolver\ResolverInterface as Resolver;
 
 /**
  * Interface class for Zend_View compatible template engine implementations
@@ -32,10 +21,8 @@ use Zend\View\Exception,
  * @category   Zend
  * @package    Zend_View
  * @subpackage Renderer
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
-class FeedRenderer implements Renderer
+class FeedRenderer implements RendererInterface
 {
     /**
      * @var Resolver
@@ -63,10 +50,10 @@ class FeedRenderer implements Renderer
 
     /**
      * Set the resolver used to map a template name to a resource the renderer may consume.
-     * 
+     *
      * @todo   Determine use case for resolvers for feeds
-     * @param  Resolver $resolver 
-     * @return Renderer
+     * @param  Resolver $resolver
+     * @return FeedRenderer
      */
     public function setResolver(Resolver $resolver)
     {
@@ -77,8 +64,9 @@ class FeedRenderer implements Renderer
      * Renders values as JSON
      *
      * @todo   Determine what use case exists for accepting only $nameOrModel
-     * @param  string|Model $name The script/resource process, or a view model
-     * @param  null|array|\ArrayAccess Values to use during rendering
+     * @param  string|Model $nameOrModel The script/resource process, or a view model
+     * @param  null|array|\ArrayAccess $values Values to use during rendering
+     * @throws Exception\InvalidArgumentException
      * @return string The script output.
      */
     public function render($nameOrModel, $values = null)
@@ -86,7 +74,7 @@ class FeedRenderer implements Renderer
         if ($nameOrModel instanceof Model) {
             // Use case 1: View Model provided
             // Non-FeedModel: cast to FeedModel
-            if (!$nameOrModel instanceof Model\FeedModel) {
+            if (!$nameOrModel instanceof FeedModel) {
                 $vars    = $nameOrModel->getVariables();
                 $options = $nameOrModel->getOptions();
                 $type    = $this->getFeedType();
@@ -95,11 +83,11 @@ class FeedRenderer implements Renderer
                 } else {
                     $this->setFeedType($type);
                 }
-                $nameOrModel = new Model\FeedModel($vars, array('feed_type' => $type));
+                $nameOrModel = new FeedModel($vars, array('feed_type' => $type));
             }
         } elseif (is_string($nameOrModel)) {
             // Use case 2: string $nameOrModel + array|Traversable|Feed $values
-            $nameOrModel = new Model\FeedModel($values, (array) $nameOrModel);
+            $nameOrModel = new FeedModel($values, (array) $nameOrModel);
         } else {
             // Use case 3: failure
             throw new Exception\InvalidArgumentException(sprintf(
@@ -126,6 +114,7 @@ class FeedRenderer implements Renderer
      * Set feed type ('rss' or 'atom')
      *
      * @param  string $feedType
+     * @throws Exception\InvalidArgumentException
      * @return FeedRenderer
      */
     public function setFeedType($feedType)
@@ -141,7 +130,7 @@ class FeedRenderer implements Renderer
         $this->feedType = $feedType;
         return $this;
     }
-    
+
     /**
      * Get feed type
      *

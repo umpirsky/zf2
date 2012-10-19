@@ -1,36 +1,22 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Cache
- * @subpackage Storage
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Cache
  */
 
 namespace Zend\Cache\Storage\Plugin;
 
-use Traversable,
-    Zend\Cache\Exception,
-    Zend\Cache\Storage\ExceptionEvent,
-    Zend\EventManager\EventCollection;
+use Zend\Cache\Exception;
+use Zend\Cache\Storage\ExceptionEvent;
+use Zend\EventManager\EventManagerInterface;
 
 /**
  * @category   Zend
  * @package    Zend_Cache
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 class ExceptionHandler extends AbstractPlugin
 {
@@ -44,13 +30,14 @@ class ExceptionHandler extends AbstractPlugin
     /**
      * Attach
      *
-     * @param  EventCollection $eventCollection
+     * @param  EventManagerInterface $events
+     * @param  int                   $priority
      * @return ExceptionHandler
      * @throws Exception\LogicException
      */
-    public function attach(EventCollection $eventCollection)
+    public function attach(EventManagerInterface $events, $priority = 1)
     {
-        $index = spl_object_hash($eventCollection);
+        $index = spl_object_hash($events);
         if (isset($this->handles[$index])) {
             throw new Exception\LogicException('Plugin already attached');
         }
@@ -60,54 +47,39 @@ class ExceptionHandler extends AbstractPlugin
         $this->handles[$index] = & $handles;
 
         // read
-        $handles[] = $eventCollection->attach('getItem.exception', $callback);
-        $handles[] = $eventCollection->attach('getItems.exception', $callback);
+        $handles[] = $events->attach('getItem.exception', $callback, $priority);
+        $handles[] = $events->attach('getItems.exception', $callback, $priority);
 
-        $handles[] = $eventCollection->attach('hasItem.exception', $callback);
-        $handles[] = $eventCollection->attach('hasItems.exception', $callback);
+        $handles[] = $events->attach('hasItem.exception', $callback, $priority);
+        $handles[] = $events->attach('hasItems.exception', $callback, $priority);
 
-        $handles[] = $eventCollection->attach('getMetadata.exception', $callback);
-        $handles[] = $eventCollection->attach('getMetadatas.exception', $callback);
-
-        // non-blocking
-        $handles[] = $eventCollection->attach('getDelayed.exception', $callback);
-        $handles[] = $eventCollection->attach('find.exception', $callback);
-
-        $handles[] = $eventCollection->attach('fetch.exception', $callback);
-        $handles[] = $eventCollection->attach('fetchAll.exception', $callback);
+        $handles[] = $events->attach('getMetadata.exception', $callback, $priority);
+        $handles[] = $events->attach('getMetadatas.exception', $callback, $priority);
 
         // write
-        $handles[] = $eventCollection->attach('setItem.exception', $callback);
-        $handles[] = $eventCollection->attach('setItems.exception', $callback);
+        $handles[] = $events->attach('setItem.exception', $callback, $priority);
+        $handles[] = $events->attach('setItems.exception', $callback, $priority);
 
-        $handles[] = $eventCollection->attach('addItem.exception', $callback);
-        $handles[] = $eventCollection->attach('addItems.exception', $callback);
+        $handles[] = $events->attach('addItem.exception', $callback, $priority);
+        $handles[] = $events->attach('addItems.exception', $callback, $priority);
 
-        $handles[] = $eventCollection->attach('replaceItem.exception', $callback);
-        $handles[] = $eventCollection->attach('replaceItems.exception', $callback);
+        $handles[] = $events->attach('replaceItem.exception', $callback, $priority);
+        $handles[] = $events->attach('replaceItems.exception', $callback, $priority);
 
-        $handles[] = $eventCollection->attach('touchItem.exception', $callback);
-        $handles[] = $eventCollection->attach('touchItems.exception', $callback);
+        $handles[] = $events->attach('touchItem.exception', $callback, $priority);
+        $handles[] = $events->attach('touchItems.exception', $callback, $priority);
 
-        $handles[] = $eventCollection->attach('removeItem.exception', $callback);
-        $handles[] = $eventCollection->attach('removeItems.exception', $callback);
+        $handles[] = $events->attach('removeItem.exception', $callback, $priority);
+        $handles[] = $events->attach('removeItems.exception', $callback, $priority);
 
-        $handles[] = $eventCollection->attach('checkAndSetItem.exception', $callback);
+        $handles[] = $events->attach('checkAndSetItem.exception', $callback, $priority);
 
         // increment / decrement item(s)
-        $handles[] = $eventCollection->attach('incrementItem.exception', $callback);
-        $handles[] = $eventCollection->attach('incrementItems.exception', $callback);
+        $handles[] = $events->attach('incrementItem.exception', $callback, $priority);
+        $handles[] = $events->attach('incrementItems.exception', $callback, $priority);
 
-        $handles[] = $eventCollection->attach('decrementItem.exception', $callback);
-        $handles[] = $eventCollection->attach('decrementItems.exception', $callback);
-
-        // clear
-        $handles[] = $eventCollection->attach('clear.exception', $callback);
-        $handles[] = $eventCollection->attach('clearByNamespace.exception', $callback);
-
-        // additional
-        $handles[] = $eventCollection->attach('optimize.exception', $callback);
-        $handles[] = $eventCollection->attach('getCapacity.exception', $callback);
+        $handles[] = $events->attach('decrementItem.exception', $callback, $priority);
+        $handles[] = $events->attach('decrementItems.exception', $callback, $priority);
 
         return $this;
     }
@@ -115,20 +87,20 @@ class ExceptionHandler extends AbstractPlugin
     /**
      * Detach
      *
-     * @param  EventCollection $eventCollection
+     * @param  EventManagerInterface $events
      * @return ExceptionHandler
      * @throws Exception\LogicException
      */
-    public function detach(EventCollection $eventCollection)
+    public function detach(EventManagerInterface $events)
     {
-        $index = spl_object_hash($eventCollection);
+        $index = spl_object_hash($events);
         if (!isset($this->handles[$index])) {
             throw new Exception\LogicException('Plugin not attached');
         }
 
         // detach all handles of this index
         foreach ($this->handles[$index] as $handle) {
-            $eventCollection->detach($handle);
+            $events->detach($handle);
         }
 
         // remove all detached handles

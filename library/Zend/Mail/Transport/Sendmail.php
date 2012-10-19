@@ -1,34 +1,21 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Mail
- * @subpackage Transport
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Mail
  */
 
 namespace Zend\Mail\Transport;
 
-use Traversable,
-    Zend\Mail\AddressDescription,
-    Zend\Mail\AddressList,
-    Zend\Mail\Exception,
-    Zend\Mail\Header,
-    Zend\Mail\Headers,
-    Zend\Mail\Message,
-    Zend\Mail\Transport;
+use Traversable;
+use Zend\Mail;
+use Zend\Mail\Address\AddressInterface;
+use Zend\Mail\Exception;
+use Zend\Mail\Headers;
+use Zend\Mail\Header\HeaderInterface;
 
 /**
  * Class for sending email via the PHP internal mail() function
@@ -36,10 +23,8 @@ use Traversable,
  * @category   Zend
  * @package    Zend_Mail
  * @subpackage Transport
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
-class Sendmail implements Transport
+class Sendmail implements TransportInterface
 {
     /**
      * Config options for sendmail parameters
@@ -50,7 +35,7 @@ class Sendmail implements Transport
 
     /**
      * Callback to use when sending mail; typically, {@link mailHandler()}
-     * 
+     *
      * @var callable
      */
     protected $callable;
@@ -70,7 +55,6 @@ class Sendmail implements Transport
      * Constructor.
      *
      * @param  null|string|array|Traversable $parameters OPTIONAL (Default: null)
-     * @return void
      */
     public function __construct($parameters = null)
     {
@@ -84,8 +68,9 @@ class Sendmail implements Transport
      * Set sendmail parameters
      *
      * Used to populate the additional_parameters argument to mail()
-     * 
-     * @param  null|string|array|Traversable $parameters 
+     *
+     * @param  null|string|array|Traversable $parameters
+     * @throws \Zend\Mail\Exception\InvalidArgumentException
      * @return Sendmail
      */
     public function setParameters($parameters)
@@ -97,7 +82,7 @@ class Sendmail implements Transport
 
         if (!is_array($parameters) && !$parameters instanceof Traversable) {
             throw new Exception\InvalidArgumentException(sprintf(
-                '%s expects a string, array, or Traversable object of paremeters; received "%s"',
+                '%s expects a string, array, or Traversable object of parameters; received "%s"',
                 __METHOD__,
                 (is_object($parameters) ? get_class($parameters) : gettype($parameters))
             ));
@@ -117,8 +102,9 @@ class Sendmail implements Transport
      * Set callback to use for mail
      *
      * Primarily for testing purposes, but could be used to curry arguments.
-     * 
-     * @param  callable $callable 
+     *
+     * @param  callable $callable
+     * @throws \Zend\Mail\Exception\InvalidArgumentException
      * @return Sendmail
      */
     public function setCallable($callable)
@@ -136,11 +122,10 @@ class Sendmail implements Transport
 
     /**
      * Send a message
-     * 
-     * @param  Message $message 
-     * @return void
+     *
+     * @param  \Zend\Mail\Message $message
      */
-    public function send(Message $message)
+    public function send(Mail\Message $message)
     {
         $to      = $this->prepareRecipients($message);
         $subject = $this->prepareSubject($message);
@@ -153,13 +138,14 @@ class Sendmail implements Transport
 
     /**
      * Prepare recipients list
-     * 
-     * @param  Message $message 
+     *
+     * @param  \Zend\Mail\Message $message
+     * @throws \Zend\Mail\Exception\RuntimeException
      * @return string
      */
-    protected function prepareRecipients(Message $message)
+    protected function prepareRecipients(Mail\Message $message)
     {
-        $headers = $message->headers();
+        $headers = $message->getHeaders();
 
         if (!$headers->has('to')) {
             throw new Exception\RuntimeException('Invalid email; contains no "To" header');
@@ -173,7 +159,7 @@ class Sendmail implements Transport
 
         // If not on Windows, return normal string
         if (!$this->isWindowsOs()) {
-            return $to->getFieldValue();
+            return $to->getFieldValue(HeaderInterface::FORMAT_ENCODED);
         }
 
         // Otherwise, return list of emails
@@ -187,22 +173,27 @@ class Sendmail implements Transport
 
     /**
      * Prepare the subject line string
-     * 
-     * @param  Message $message 
+     *
+     * @param  \Zend\Mail\Message $message
      * @return string
      */
-    protected function prepareSubject(Message $message)
+    protected function prepareSubject(Mail\Message $message)
     {
-        return $message->getSubject();
+        $headers = $message->getHeaders();
+        if (!$headers->has('subject')) {
+            return null;
+        }
+        $header = $headers->get('subject');
+        return $header->getFieldValue(HeaderInterface::FORMAT_ENCODED);
     }
 
     /**
      * Prepare the body string
-     * 
-     * @param  Message $message 
+     *
+     * @param  \Zend\Mail\Message $message
      * @return string
      */
-    protected function prepareBody(Message $message)
+    protected function prepareBody(Mail\Message $message)
     {
         if (!$this->isWindowsOs()) {
             // *nix platforms can simply return the body text
@@ -217,40 +208,34 @@ class Sendmail implements Transport
 
     /**
      * Prepare the textual representation of headers
-     * 
-     * @param  Message $message
+     *
+     * @param  \Zend\Mail\Message $message
      * @return string
      */
-    protected function prepareHeaders(Message $message)
+    protected function prepareHeaders(Mail\Message $message)
     {
-        $headers = $message->headers();
-
         // On Windows, simply return verbatim
         if ($this->isWindowsOs()) {
-            return $headers->toString();
+            return $message->getHeaders()->toString();
         }
 
         // On *nix platforms, strip the "to" header
-        $headersToSend = new Headers();
-        foreach ($headers as $header) {
-            if ('To' == $header->getFieldName()) {
-                continue;
-            }
-            $headersToSend->addHeader($header);
-        }
-        return $headersToSend->toString();
+        $headers = clone $message->getHeaders();
+        $headers->removeHeader('To');
+        $headers->removeHeader('Subject');
+        return $headers->toString();
     }
 
     /**
      * Prepare additional_parameters argument
      *
-     * Basically, overrides the MAIL FROM envelope with either the Sender or 
+     * Basically, overrides the MAIL FROM envelope with either the Sender or
      * From address.
-     * 
-     * @param  Message $message 
+     *
+     * @param  \Zend\Mail\Message $message
      * @return string
      */
-    protected function prepareParameters(Message $message)
+    protected function prepareParameters(Mail\Message $message)
     {
         if ($this->isWindowsOs()) {
             return null;
@@ -259,12 +244,12 @@ class Sendmail implements Transport
         $parameters = (string) $this->parameters;
 
         $sender = $message->getSender();
-        if ($sender instanceof AddressDescription) {
+        if ($sender instanceof AddressInterface) {
             $parameters .= ' -r ' . $sender->getEmail();
             return $parameters;
         }
 
-        $from = $message->from();
+        $from = $message->getFrom();
         if (count($from)) {
             $from->rewind();
             $sender      = $from->current();
@@ -282,8 +267,8 @@ class Sendmail implements Transport
      * @param  string $subject
      * @param  string $message
      * @param  string $headers
-     * @return void
-     * @throws Exception\RuntimeException on mail failure
+     * @param  $parameters
+     * @throws \Zend\Mail\Exception\RuntimeException
      */
     public function mailHandler($to, $subject, $message, $headers, $parameters)
     {
@@ -312,7 +297,7 @@ class Sendmail implements Transport
      * @param string $errfile
      * @param string $errline
      * @param array  $errcontext
-     * @return true
+     * @return boolean always true
      */
     public function handleMailErrors($errno, $errstr, $errfile = null, $errline = null, array $errcontext = null)
     {
@@ -322,7 +307,7 @@ class Sendmail implements Transport
 
     /**
      * Is this a windows OS?
-     * 
+     *
      * @return bool
      */
     protected function isWindowsOs()

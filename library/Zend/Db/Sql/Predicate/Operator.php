@@ -1,33 +1,21 @@
 <?php
 /**
- * Zend Framework
+ * Zend Framework (http://framework.zend.com/)
  *
- * LICENSE
- *
- * This source file is subject to the new BSD license that is bundled
- * with this package in the file LICENSE.txt.
- * It is also available through the world-wide-web at this URL:
- * http://framework.zend.com/license/new-bsd
- * If you did not receive a copy of the license and are unable to
- * obtain it through the world-wide-web, please send an email
- * to license@zend.com so we can send you a copy immediately.
- *
- * @category   Zend
- * @package    Zend_Db
- * @subpackage Sql
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
+ * @link      http://github.com/zendframework/zf2 for the canonical source repository
+ * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
+ * @license   http://framework.zend.com/license/new-bsd New BSD License
+ * @package   Zend_Db
  */
 
 namespace Zend\Db\Sql\Predicate;
 
+use Zend\Db\Sql\Exception;
 
 /**
  * @category   Zend
  * @package    Zend_Db
  * @subpackage Sql
- * @copyright  Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
- * @license    http://framework.zend.com/license/new-bsd     New BSD License
  */
 class Operator implements PredicateInterface
 {
@@ -53,45 +41,49 @@ class Operator implements PredicateInterface
         self::TYPE_IDENTIFIER,
         self::TYPE_VALUE,
     );
+
     protected $left          = null;
     protected $leftType      = self::TYPE_IDENTIFIER;
-    protected $operator      = null;
+    protected $operator      = self::OPERATOR_EQUAL_TO;
     protected $right         = null;
     protected $rightType     = self::TYPE_VALUE;
 
     /**
      * Constructor
-     * 
-     * @param  mixed $left 
-     * @param  string $operator 
-     * @param  mixed $right 
-     * @param  TYPE_IDENTIFIER|TYPE_VALUE $leftType 
-     * @param  TYPE_IDENTIFIER|TYPE_VALUE $rightType 
-     * @return void
+     *
+     * @param  int|float|bool|string $left
+     * @param  string $operator
+     * @param  int|float|bool|string $right
+     * @param  string $leftType TYPE_IDENTIFIER or TYPE_VALUE by default TYPE_IDENTIFIER {@see allowedTypes}
+     * @param  string $rightType TYPE_IDENTIFIER or TYPE_VALUE by default TYPE_VALUE {@see allowedTypes}
      */
     public function __construct($left = null, $operator = self::OPERATOR_EQUAL_TO, $right = null, $leftType = self::TYPE_IDENTIFIER, $rightType = self::TYPE_VALUE)
     {
-        if ($left) {
+        if ($left !== null) {
             $this->setLeft($left);
         }
-        if ($operator) {
+
+        if ($operator !== self::OPERATOR_EQUAL_TO) {
             $this->setOperator($operator);
         }
-        if ($right) {
+
+        if ($right !== null) {
             $this->setRight($right);
         }
-        if ($leftType) {
+
+        if ($leftType !== self::TYPE_IDENTIFIER) {
             $this->setLeftType($leftType);
         }
-        if ($rightType) {
+
+        if ($rightType !== self::TYPE_VALUE) {
             $this->setRightType($rightType);
         }
     }
 
     /**
      * Set left side of operator
-     * 
-     * @param  scalar $left 
+     *
+     * @param  int|float|bool|string $left
      * @return Operator
      */
     public function setLeft($left)
@@ -102,8 +94,8 @@ class Operator implements PredicateInterface
 
     /**
      * Get left side of operator
-     * 
-     * @return scalar
+     *
+     * @return int|float|bool|string
      */
     public function getLeft()
     {
@@ -112,14 +104,15 @@ class Operator implements PredicateInterface
 
     /**
      * Set parameter type for left side of operator
-     * 
-     * @param  TYPE_IDENTIFIER|TYPE_VALUE $type
+     *
+     * @param  string $type TYPE_IDENTIFIER or TYPE_VALUE {@see allowedTypes}
+     * @throws Exception\InvalidArgumentException
      * @return Operator
      */
     public function setLeftType($type)
     {
         if (!in_array($type, $this->allowedTypes)) {
-            throw new \InvalidArgumentException(sprintf(
+            throw new Exception\InvalidArgumentException(sprintf(
                 'Invalid type "%s" provided; must be of type "%s" or "%s"',
                 $type,
                 __CLASS__ . '::TYPE_IDENTIFIER',
@@ -132,7 +125,7 @@ class Operator implements PredicateInterface
 
     /**
      * Get parameter type on left side of operator
-     * 
+     *
      * @return string
      */
     public function getLeftType()
@@ -142,8 +135,8 @@ class Operator implements PredicateInterface
 
     /**
      * Set operator string
-     * 
-     * @param  string $operator 
+     *
+     * @param  string $operator
      * @return Operator
      */
     public function setOperator($operator)
@@ -154,7 +147,7 @@ class Operator implements PredicateInterface
 
     /**
      * Get operator string
-     * 
+     *
      * @return string
      */
     public function getOperator()
@@ -164,8 +157,8 @@ class Operator implements PredicateInterface
 
     /**
      * Set right side of operator
-     * 
-     * @param  scalar $value 
+     *
+     * @param  int|float|bool|string $value
      * @return Operator
      */
     public function setRight($value)
@@ -176,8 +169,8 @@ class Operator implements PredicateInterface
 
     /**
      * Get right side of operator
-     * 
-     * @return scalar
+     *
+     * @return int|float|bool|string
      */
     public function getRight()
     {
@@ -186,14 +179,15 @@ class Operator implements PredicateInterface
 
     /**
      * Set parameter type for right side of operator
-     * 
-     * @param  TYPE_IDENTIFIER|TYPE_VALUE $type
+     *
+     * @param  string $type TYPE_IDENTIFIER or TYPE_VALUE {@see allowedTypes}
+     * @throws Exception\InvalidArgumentException
      * @return Operator
      */
     public function setRightType($type)
     {
         if (!in_array($type, $this->allowedTypes)) {
-            throw new \InvalidArgumentException(sprintf(
+            throw new Exception\InvalidArgumentException(sprintf(
                 'Invalid type "%s" provided; must be of type "%s" or "%s"',
                 $type,
                 __CLASS__ . '::TYPE_IDENTIFIER',
@@ -206,7 +200,7 @@ class Operator implements PredicateInterface
 
     /**
      * Get parameter type on right side of operator
-     * 
+     *
      * @return string
      */
     public function getRightType()
@@ -216,15 +210,16 @@ class Operator implements PredicateInterface
 
     /**
      * Get predicate parts for where statement
-     * 
+     *
      * @return array
      */
-    public function getWhereParts()
+    public function getExpressionData()
     {
         return array(array(
-            '%s ' . $this->operator . ' %s', 
-            array($this->left, $this->right), 
+            '%s ' . $this->operator . ' %s',
+            array($this->left, $this->right),
             array($this->leftType, $this->rightType)
         ));
     }
+
 }
